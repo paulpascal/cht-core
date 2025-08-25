@@ -8,6 +8,7 @@ import { RulesEngineService } from '@mm-services/rules-engine.service';
 import { SessionService } from '@mm-services/session.service';
 import { provideMockStore } from '@ngrx/store/testing';
 import { PerformanceService } from '@mm-services/performance.service';
+import { ReportingPeriod } from '@mm-modules/analytics/analytics-target-aggregates-sidebar-filter.component';
 
 describe('AnalyticsTargetsComponent', () => {
   let component: AnalyticsTargetsComponent;
@@ -139,4 +140,100 @@ describe('AnalyticsTargetsComponent', () => {
     expect(consoleErrorMock.callCount).to.equal(1);
     expect(consoleErrorMock.args[0][0]).to.equal('Error getting targets');
   }));
+
+  describe('Period Selection', () => {
+    it('should default to current month', () => {
+      expect(component.selectedReportingPeriod).to.equal(ReportingPeriod.CURRENT);
+    });
+
+    it('should have ReportingPeriod enum available for template', () => {
+      expect(component.ReportingPeriod).to.equal(ReportingPeriod);
+    });
+
+    it('should switch to previous month when selected', fakeAsync(() => {
+      sinon.reset();
+      rulesEngineService.isEnabled.resolves(true);
+      rulesEngineService.fetchTargets.resolves([{ id: 'prev_target' }]);
+      
+      component.onPeriodChange(ReportingPeriod.PREVIOUS);
+      tick(50);
+      
+      expect(component.selectedReportingPeriod).to.equal(ReportingPeriod.PREVIOUS);
+      expect(component.periodSwitching).to.equal(false);
+      expect(rulesEngineService.fetchTargets.callCount).to.equal(1);
+      expect(rulesEngineService.fetchTargets.args[0][0]).to.equal(ReportingPeriod.PREVIOUS);
+    }));
+
+    it('should not reload if same period selected', () => {
+      sinon.reset();
+      // Spy on the service method instead of the private component method
+      const fetchTargetsSpy = sinon.spy(rulesEngineService, 'fetchTargets');
+      
+      component.onPeriodChange(ReportingPeriod.CURRENT); // Already current
+      
+      expect(fetchTargetsSpy.callCount).to.equal(0);
+      expect(component.periodSwitching).to.equal(false);
+      expect(component.loading).to.equal(false);
+    });
+
+    it('should handle loading states during period switch', fakeAsync(() => {
+      sinon.reset();
+      rulesEngineService.isEnabled.resolves(true);
+      rulesEngineService.fetchTargets.resolves([]);
+      
+      expect(component.loading).to.equal(false);
+      expect(component.periodSwitching).to.equal(false);
+      
+      component.onPeriodChange(ReportingPeriod.PREVIOUS);
+      
+      expect(component.loading).to.equal(true);
+      expect(component.periodSwitching).to.equal(true);
+      
+      tick(50);
+      
+      expect(component.loading).to.equal(false);
+      expect(component.periodSwitching).to.equal(false);
+    }));
+
+    it('should fetch current month targets with CURRENT period', fakeAsync(() => {
+      sinon.reset();
+      rulesEngineService.isEnabled.resolves(true);
+      rulesEngineService.fetchTargets.resolves([{ id: 'current_target' }]);
+      
+      component.onPeriodChange(ReportingPeriod.CURRENT);
+      tick(50);
+      
+      expect(rulesEngineService.fetchTargets.callCount).to.equal(1);
+      expect(rulesEngineService.fetchTargets.args[0][0]).to.equal(ReportingPeriod.CURRENT);
+      expect(component.targets).to.deep.equal([{ id: 'current_target' }]);
+    }));
+
+    it('should fetch previous month targets with PREVIOUS period', fakeAsync(() => {
+      sinon.reset();
+      rulesEngineService.isEnabled.resolves(true);
+      rulesEngineService.fetchTargets.resolves([{ id: 'previous_target' }]);
+      
+      component.onPeriodChange(ReportingPeriod.PREVIOUS);
+      tick(50);
+      
+      expect(rulesEngineService.fetchTargets.callCount).to.equal(1);
+      expect(rulesEngineService.fetchTargets.args[0][0]).to.equal(ReportingPeriod.PREVIOUS);
+      expect(component.targets).to.deep.equal([{ id: 'previous_target' }]);
+    }));
+
+    it('should handle errors during period switch', fakeAsync(() => {
+      sinon.reset();
+      rulesEngineService.isEnabled.rejects(new Error('Fetch error'));
+      const consoleErrorMock = sinon.stub(console, 'error');
+      
+      component.onPeriodChange(ReportingPeriod.PREVIOUS);
+      tick(50);
+      
+      expect(component.loading).to.equal(false);
+      expect(component.periodSwitching).to.equal(false);
+      expect(!!component.errorStack).to.be.true;
+      expect(component.targets).to.deep.equal([]);
+      expect(consoleErrorMock.callCount).to.equal(1);
+    }));
+  });
 });
