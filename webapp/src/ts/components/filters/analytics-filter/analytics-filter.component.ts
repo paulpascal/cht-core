@@ -103,6 +103,10 @@ export class AnalyticsFilterComponent implements AfterContentInit, AfterContentC
     return this.getCurrentModuleId() === AGGREGATE_TARGETS_ID;
   }
 
+  private isTargets() {
+    return this.getCurrentModuleId() === 'targets';
+  }
+
   private isTargetAggregateEnabled() {
     return this.targetAggregatesService.isEnabled();
   }
@@ -111,7 +115,11 @@ export class AnalyticsFilterComponent implements AfterContentInit, AfterContentC
     const isAdmin = this.sessionService.isAdmin();
     const isTargetAggregateEnabled = await this.isTargetAggregateEnabled();
 
-    this.showFilterButton = !isAdmin && this.isTargetAggregates() && isTargetAggregateEnabled;
+    // Show filter button for both target aggregates and regular targets
+    this.showFilterButton = !isAdmin && (
+      (this.isTargetAggregates() && isTargetAggregateEnabled) || 
+      this.isTargets()
+    );
   }
 
   openSidebar() {

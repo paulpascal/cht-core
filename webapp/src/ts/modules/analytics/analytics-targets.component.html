@@ -1,19 +1,22 @@
-<div class="page scrolling">
-  <div class="item-content empty-selection" *ngIf="targetsDisabled">
+<div class="page" *ngIf="targetsDisabled || loading">
+  <div class="item-content empty-selection disabled" *ngIf="!loading; else loaderTpl">
     <div>{{ 'targets.disabled' | translate }}</div>
   </div>
+</div>
 
-  <div class="item-content empty-selection" *ngIf="!targetsDisabled && loading">
-    <div><div class="loader"></div></div>
-  </div>
+<div class="page scrolling" *ngIf="!targetsDisabled && !loading"
+     [ngClass]="{'sidebar-open': sidebarFilterOpen, 'sidebar-closed': !sidebarFilterOpen}">
+  <error-log class="targets" *ngIf="!!errorStack" [errorStack]="errorStack" [errorFor]="'targets'"></error-log>
 
-  <div class="item-content empty-selection" *ngIf="!targetsDisabled && !loading && !targets?.length && !errorStack">
+  <div class="item-content empty-selection" *ngIf="!targets?.length && !errorStack">
     <div>{{ 'targets.no_targets' | translate }}</div>
   </div>
 
-  <error-log class="targets" *ngIf="!targetsDisabled && !loading && !!errorStack" [errorStack]="errorStack" [errorFor]="'targets'"></error-log>
+  <div class="item-content empty-selection" *ngIf="periodSwitching">
+    <div><div class="loader"></div></div>
+  </div>
 
-  <div class="targets" *ngIf="!targetsDisabled && !loading && targets?.length && !errorStack">
+  <div class="targets" *ngIf="!errorStack && !periodSwitching">
     <div class="target" *ngFor="let target of targets"
       [ngClass]="{ 'has-goal': target.goal >= 0, 'goal-met': (target.value?.pass >= target.goal) || (target.value?.percent >= target.goal) }"
       attr.test-target-id="{{ target.id }}">
@@ -40,4 +43,18 @@
       </div>
     </div>
   </div>
+
+  <mm-analytics-targets-sidebar-filter
+    class="sidebar-filter-wrapper"
+    [selectedPeriod]="selectedReportingPeriod"
+    (reportingPeriodSelectionChanged)="onReportingPeriodChanged($event)">
+  </mm-analytics-targets-sidebar-filter>
 </div>
+
+<ng-template #loaderTpl>
+  <div class="item-content empty-selection">
+    <div>
+      <div class="loader"></div>
+    </div>
+  </div>
+</ng-template>
