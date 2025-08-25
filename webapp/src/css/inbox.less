@@ -998,13 +998,14 @@ mm-fast-action-button.mobile-only {
       .page {
         max-width: 100%;
       }
-      .page:not(.target-aggregates) {
+      .page:not(.target-aggregates):not(.analytics-targets) {
         > div {
           margin: 0 auto;
         }
       }
 
-      .target-aggregates {
+      .target-aggregates,
+      .analytics-targets {
         /* position this absolute div in the horizontal center */
         left: 0;
         right: 0;
@@ -1659,9 +1660,14 @@ mm-sidebar-menu .mat-sidenav-container {
     }
   }
 
+
   .left-pane,
   .right-pane {
     width: 100%;
+  }
+
+  .analytics-targets .right-pane {
+    left: 0 !important;
   }
   .inbox-items,
   .content-pane {
