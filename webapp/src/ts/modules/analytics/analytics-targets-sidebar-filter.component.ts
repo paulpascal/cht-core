@@ -74,7 +74,6 @@ export class AnalyticsTargetsSidebarFilterComponent implements OnInit, OnDestroy
   }
 
   applyFilter(): void {
-    this.reportingPeriodSelectionChanged.emit(this.selectedReportingPeriod);
     this.toggleSidebarFilter();
   }
   

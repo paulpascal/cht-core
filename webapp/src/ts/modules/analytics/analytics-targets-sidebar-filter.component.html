@@ -30,7 +30,8 @@
                 name="reporting-period"
                 class="filter-option-radio"
                 [value]="period.value"
-                [(ngModel)]="selectedReportingPeriod">
+                [(ngModel)]="selectedReportingPeriod"
+                (change)="fetchTargetsByReportingPeriod()">
               <span class="filter-option-label">
                 {{ period.label | translate }}
               </span>
@@ -41,7 +42,7 @@
     </div>
 
     <div class="sidebar-footer">
-      <button type="button" class="btn btn-primary" (click)="applyFilter()">
+      <button type="button" class="btn btn-primary" (click)="toggleSidebarFilter()">
         {{ 'reports.sidebar.filter.submit' | translate }}
       </button>
     </div>
