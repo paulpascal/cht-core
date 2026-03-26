@@ -14,7 +14,11 @@ import { TranslateService } from '@mm-services/translate.service';
 import { MigrationsService } from '@mm-services/migrations.service';
 import { ReplicationService } from '@mm-services/replication.service';
 import { PerformanceService } from '@mm-services/performance.service';
+import { P2pConfigService } from '@mm-services/p2p-config.service';
+import { P2pTransitPurgeService } from '@mm-services/p2p-transit-purge.service';
 import { DOC_IDS, DOC_TYPES } from '@medic/constants';
+
+declare const medicmobile_android: any;
 
 const READ_ONLY_TYPES = ['form', DOC_TYPES.TRANSLATIONS];
 const READ_ONLY_IDS = [
@@ -88,6 +92,8 @@ export class DBSyncService {
     private translateService:TranslateService,
     private migrationsService:MigrationsService,
     private replicationService:ReplicationService,
+    private p2pConfigService:P2pConfigService,
+    private p2pTransitPurgeService:P2pTransitPurgeService,
   ) {
     this.globalActions = new GlobalActions(this.store);
   }
@@ -103,6 +109,7 @@ export class DBSyncService {
   };
 
   private readonly observable = new Subject<SyncState>();
+  private lastToWriteFailures = 0;
 
   isEnabled() {
     return !this.sessionService.isOnlineOnly();
@@ -137,6 +144,7 @@ export class DBSyncService {
       })
       .then(info => {
         console.debug(`Replication to successful`, info);
+        this.lastToWriteFailures = info?.doc_write_failures || 0;
         this.setLastReplicatedSeq(info?.last_seq);
         telemetryEntry.recordSuccess(info);
       })
@@ -244,6 +252,13 @@ export class DBSyncService {
       console.debug('Finished syncing!');
       window.localStorage.setItem(LAST_REPLICATED_DATE_KEY, Date.now() + '');
       this.syncIsRecent = syncState.from === SyncStatus.Success;
+
+      // Auto-purge P2P transit docs after successful sync with 0 write failures (Gap 2 fix).
+      // When supervisor comes online hours after P2P, normal sync pushes docs to server.
+      // This triggers purge of transit docs that are no longer needed locally.
+      if (this.lastToWriteFailures === 0) {
+        this.purgeP2pTransitDocsIfNeeded();
+      }
     }
 
     if (force) {
@@ -251,6 +266,22 @@ export class DBSyncService {
     }
 
     this.sendUpdate(syncState);
+  }
+
+  private async purgeP2pTransitDocsIfNeeded() {
+    try {
+      // After successful sync with 0 write failures, all local docs (including
+      // P2P-received transit docs) are on the server. Mark all transit batches
+      // as pushed and purge them locally. markAllBatchesPushedAndPurge() returns
+      // early (purged:0) if _local/p2p-transit-docs doesn't exist (no-op for non-P2P users).
+      const result = await this.p2pTransitPurgeService.markAllBatchesPushedAndPurge();
+      if (result.purged > 0) {
+        console.info(`db-sync: auto-purged ${result.purged} P2P transit docs after successful sync`);
+      }
+    } catch (err) {
+      // Non-blocking — don't break sync for purge failure
+      console.debug('db-sync: P2P transit purge check skipped', err);
+    }
   }
 
   private async startSyncMedic(force?, quick?) {
@@ -345,6 +376,14 @@ export class DBSyncService {
   }
 
   /**
+  * Get the number of doc_write_failures from the last replication-to-server.
+  * Returns 0 if all docs were written successfully.
+  */
+  getLastToWriteFailures(): number {
+    return this.lastToWriteFailures;
+  }
+
+  /**
   * Set the current user's online status to control when replications will be attempted.
   *
   * @param onlineStatus {Boolean} The current online state of the user.
@@ -376,10 +415,36 @@ export class DBSyncService {
   *
   * @returns Promise which resolves when both directions of the replication complete.
   */
+  private isP2pActive(): boolean {
+    try {
+      if (typeof medicmobile_android !== 'undefined' &&
+          typeof medicmobile_android.p2pIsActive === 'function') {
+        const result = JSON.parse(medicmobile_android.p2pIsActive());
+        return !!result.active;
+      }
+    } catch (err) {
+      // Bridge unavailable or parse error — assume not active
+    }
+    return false;
+  }
+
   async sync(force?, quick?) {
     if (!this.isEnabled()) {
       this.sendUpdate({ state: SyncStatus.Disabled });
       return Promise.resolve();
+    }
+
+    // Skip sync cycle when P2P is active and config flag is enabled
+    if (!force && this.isP2pActive()) {
+      try {
+        const shouldPause = await this.p2pConfigService.shouldPauseReplicationDuringSync();
+        if (shouldPause) {
+          console.log('db-sync: skipping sync cycle — P2P active and pause_replication_during_sync enabled');
+          return Promise.resolve();
+        }
+      } catch (err) {
+        // Config unavailable — don't block sync
+      }
     }
 
     await this.migrateDb();
