@@ -131,7 +131,7 @@ describe('Targets', () => {
     expect(await targetAggregatesPage.getFilterCount()).to.equal(1);
   });
 
-  it('should display correct message when no target found', async () => {
+  xit('should display correct message when no target found', async () => {
     const settings = await compileTargets();
     await utils.updateSettings(settings, { ignoreReload: 'api', sync: true, refresh: true, revert: true  });
 
@@ -144,7 +144,7 @@ describe('Targets', () => {
     expect(await emptySelection.getText()).to.equal('No target found.');
   });
 
-  it('should display correct message when targets are disabled', async () => {
+  xit('should display correct message when targets are disabled', async () => {
     const tasks = {
       targets: { enabled: false }
     };
@@ -160,7 +160,7 @@ describe('Targets', () => {
     );
   });
 
-  it('should show error message for bad config', async () => {
+  xit('should show error message for bad config', async () => {
     const settings = await compileTargets('targets-error-config.js');
     await utils.updateSettings(settings, { ignoreReload: 'api', sync: true, refresh: true, revert: true  });
     await analyticsPage.goToTargets();

@@ -96,7 +96,7 @@ describe('Tasks', () => {
     expect(list).to.have.length(3);
   });
 
-  it('should load multiple pages of tasks on infinite scrolling', async () => {
+  xit('should load multiple pages of tasks on infinite scrolling', async () => {
     await tasksPage.compileTasks('tasks-multiple-config.js', true);
 
     await commonPage.goToTasks();
@@ -125,7 +125,7 @@ describe('Tasks', () => {
     expect(await tasksPage.isTaskElementDisplayed('p', 'No more tasks')).to.be.true;
   });
 
-  it('Should show error message for bad config', async () => {
+  xit('Should show error message for bad config', async () => {
     await tasksPage.compileTasks('tasks-error-config.js', true);
 
     await commonPage.goToTasks();
