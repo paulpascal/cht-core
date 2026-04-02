@@ -8,6 +8,7 @@ const DOC_IDS = {
   RESOURCES: 'resources',
   PRIVACY_POLICIES: 'privacy-policies',
   PARTNERS: 'partners',
+  BRANDING: 'branding',
 };
 
 // Contact Types
