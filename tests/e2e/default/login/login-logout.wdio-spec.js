@@ -3,6 +3,7 @@ const commonPage = require('@page-objects/default/common/common.wdio.page');
 const userFactory = require('@factories/cht/users/users');
 const placeFactory = require('@factories/cht/contacts/place');
 const modalPage = require('@page-objects/default/common/modal.wdio.page');
+const { USER_ROLES: { COUCHDB_ADMIN } } = require('@medic/constants');
 const constants = require('@constants');
 const utils = require('@utils');
 const { DOC_IDS } = require('@medic/constants');
@@ -109,7 +110,7 @@ describe('Login page functionality tests', () => {
       });
       const userCtxCookieValue = JSON.parse(decodeURIComponent(userCtxCookie.value));
       expect(userCtxCookieValue).to.include({ name: 'admin' });
-      expect(userCtxCookieValue.roles).to.include('_admin');
+      expect(userCtxCookieValue.roles).to.include(COUCHDB_ADMIN);
 
       const localeCookie = cookies.find(cookie => cookie.name === 'locale');
       expect(localeCookie).to.include({
