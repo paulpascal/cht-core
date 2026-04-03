@@ -145,6 +145,10 @@ const loginUser = async (username = constants.USERNAME, password = constants.PAS
   });
 };
 
+const getUserDoc = (userName = constants.USERNAME) => {
+  return getDoc(COUCH_USER_ID_PREFIX + userName);
+};
+
 const setupUserDoc = (userName = constants.USERNAME, userDoc = userSettings.build()) => {
   return getDoc(COUCH_USER_ID_PREFIX + userName)
     .then(doc => {
@@ -1116,7 +1120,7 @@ const addTranslations = async (languageCode, translations = {}) => {
       throw err;
     });
   };
-  
+
   const saveTranslationsDoc = async () => {
     const translationsDoc = await getTranslationsDoc(languageCode);
     if (builtinTranslations.includes(languageCode)) {
@@ -1725,6 +1729,7 @@ module.exports = {
   hostURL,
   parseCookieResponse,
   setupUserDoc,
+  getUserDoc,
   request,
   requestOnTestDb,
   requestOnTestMetaDb,
