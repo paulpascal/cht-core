@@ -43,6 +43,12 @@ const USER_ROLES = {
   COUCHDB_ADMIN: '_admin',
 };
 
+// Prefixes
+const PREFIXES = {
+  COUCH_USER: 'org.couchdb.user:',
+  TRANSLATIONS: 'messages-',
+};
+
 module.exports = {
   DOC_IDS,
   DOC_TYPES,
@@ -50,4 +56,5 @@ module.exports = {
   SENTINEL_METADATA,
   USER_ROLES,
   CONTACT_TYPES,
+  PREFIXES,
 };
