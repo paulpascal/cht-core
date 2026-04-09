@@ -28,6 +28,15 @@ const DOC_TYPES = {
 // HTTP Headers
 const HTTP_HEADERS = {
   REQUEST_ID: 'X-Request-Id',
+  MEDIC_SERVICE: 'X-Medic-Service',
+  MEDIC_USER: 'X-Medic-User',
+  OPENROSA_VERSION: 'X-OpenRosa-Version',
+  MEDIC_REPLICATION_ID: 'medic-replication-id',
+  LOGOUT_AUTHORIZATION: 'logout-authorization',
+};
+
+const STANDARD_HTTP_HEADERS = {
+  CONTENT_TYPE_OPTIONS: 'X-Content-Type-Options',
 };
 
 // Sentinel Metadata
@@ -59,5 +68,6 @@ module.exports = {
   SENTINEL_METADATA,
   USER_ROLES,
   CONTACT_TYPES,
+  STANDARD_HTTP_HEADERS,
   PREFIXES,
 };
