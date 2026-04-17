@@ -2,6 +2,8 @@
 <div class="inner">
   <div class="col-sm-12 page p2p-status scrolling">
 
+    <div>
+
     <!-- Loading config -->
     <mat-card *ngIf="loading">
       <mat-card-content>
@@ -341,8 +343,8 @@
       </mat-card-content>
     </mat-card>
 
-    <!-- Sync History accordion -->
-    <mat-accordion *ngIf="!loading && p2pEnabled && p2pRole && hasBridgeAvailable">
+    <!-- Sync History accordion (peer/client side only) -->
+    <mat-accordion *ngIf="!loading && p2pEnabled && isPeer && hasBridgeAvailable">
       <mat-expansion-panel>
         <mat-expansion-panel-header>
           <mat-panel-title>{{ 'p2p.history.title' | translate }} ({{ totalSessions }})</mat-panel-title>
@@ -436,5 +438,6 @@
     <!-- Bottom spacer so content doesn't hide behind bottom nav -->
     <div style="height: 140px;"></div>
 
+    </div>
   </div>
 </div>
