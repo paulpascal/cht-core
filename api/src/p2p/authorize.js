@@ -152,7 +152,7 @@ const buildPayload = (userSettings, facilityPath) => {
     facility_path: facilityPath,
     replication_depth: getReplicationDepth(userSettings.roles || []),
     allowed_relay_peers: [],
-    permissions: getPermissions(userSettings.roles || []),
+    permissions: getPermissions(userSettings.roles || [], p2pConfig),
     iat: nowSec,
     exp: nowSec + (tokenExpiryDays * 24 * 60 * 60),
     jti: crypto.randomUUID(),
@@ -177,14 +177,18 @@ const getReplicationDepth = (roles) => {
 };
 
 /**
- * Determine P2P permissions based on roles.
+ * Determine P2P permissions based on roles and config.
  */
-const getPermissions = (roles) => {
+const getPermissions = (roles, p2pConfig) => {
+  const hostRoles = p2pConfig.host_roles || [];
+  const peerRoles = p2pConfig.peer_roles || [];
+  const isHost = roles.some(r => hostRoles.includes(r));
+  const isPeer = roles.some(r => peerRoles.includes(r));
   const perms = [];
-  if (roles.includes('chw') || roles.includes('chw_supervisor')) {
+  if (isHost || isPeer) {
     perms.push('can_push', 'can_pull');
   }
-  if (roles.includes('chw_supervisor')) {
+  if (isHost) {
     perms.push('can_relay');
   }
   return perms;
@@ -238,8 +242,10 @@ const authorize = async (req, res) => {
       return serverUtils.error({ code: 403, message: 'User has no facility_id assigned' }, req, res);
     }
 
-    // 4. Check user's role is allowed
-    const allowedRoles = p2pConfig.allowed_roles || ['chw', 'chw_supervisor'];
+    // 4. Check user's role is allowed (host or peer)
+    const hostRoles = p2pConfig.host_roles || [];
+    const peerRoles = p2pConfig.peer_roles || [];
+    const allowedRoles = [...hostRoles, ...peerRoles];
     const hasAllowedRole = (userSettings.roles || []).some(role => allowedRoles.includes(role));
     if (!hasAllowedRole) {
       return serverUtils.error({ code: 403, message: 'User role not authorized for P2P sync' }, req, res);

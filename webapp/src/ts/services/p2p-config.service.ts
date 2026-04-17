@@ -18,8 +18,8 @@ export interface P2pSyncConfig {
 
 const DEFAULTS: P2pSyncConfig = {
   enabled: false,
-  host_roles: ['chw_supervisor'],
-  peer_roles: ['chw'],
+  host_roles: [],
+  peer_roles: [],
   transit_relay: {
     enabled: true,
     max_age_days: 30,

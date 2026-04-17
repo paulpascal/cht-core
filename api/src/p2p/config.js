@@ -4,8 +4,8 @@ const serverUtils = require('../server-utils');
 
 const DEFAULTS = {
   enabled: false,
-  host_roles: ['chw_supervisor'],
-  peer_roles: ['chw'],
+  host_roles: [],
+  peer_roles: [],
   transit_relay: {
     enabled: true,
     max_age_days: 30,
