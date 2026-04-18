@@ -422,7 +422,7 @@ export class DBSyncService {
         const result = JSON.parse(medicmobile_android.p2pIsActive());
         return !!result.active;
       }
-    } catch (err) {
+    } catch (_err) {
       // Bridge unavailable or parse error — assume not active
     }
     return false;
@@ -442,7 +442,7 @@ export class DBSyncService {
           console.log('db-sync: skipping sync cycle — P2P active and pause_replication_during_sync enabled');
           return Promise.resolve();
         }
-      } catch (err) {
+      } catch (_err) {
         // Config unavailable — don't block sync
       }
     }

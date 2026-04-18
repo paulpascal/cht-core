@@ -144,11 +144,13 @@ export class SidebarMenuComponent extends BaseMenuComponent implements OnInit, O
   private async checkP2pVisibility() {
     try {
       const config = await this.p2pConfigService.getConfig();
-      if (!config.enabled) return;
+      if (!config.enabled) {
+        return;
+      }
       const role = await this.p2pConfigService.getUserP2pRole();
       this.p2pVisible = role !== null;
       this.setSecondaryOptions();
-    } catch (e) {
+    } catch (_e) {
       // Keep hidden on error
     }
   }

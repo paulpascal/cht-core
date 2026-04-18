@@ -50,7 +50,9 @@ export class P2pConfigService {
         host_roles: p2p.host_roles || DEFAULTS.host_roles,
         peer_roles: p2p.peer_roles || DEFAULTS.peer_roles,
         transit_relay: {
-          enabled: p2p.transit_relay?.enabled !== undefined ? !!p2p.transit_relay.enabled : DEFAULTS.transit_relay.enabled,
+          enabled: p2p.transit_relay?.enabled !== undefined
+            ? !!p2p.transit_relay.enabled
+            : DEFAULTS.transit_relay.enabled,
           max_age_days: p2p.transit_relay?.max_age_days || DEFAULTS.transit_relay.max_age_days,
         },
         pause_replication_during_sync: p2p.pause_replication_during_sync !== undefined

@@ -6,7 +6,10 @@ import { MatButton } from '@angular/material/button';
 import { MatProgressBar } from '@angular/material/progress-bar';
 import { MatIcon } from '@angular/material/icon';
 import { MatChipsModule } from '@angular/material/chips';
-import { MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle, MatAccordion } from '@angular/material/expansion';
+import {
+  MatExpansionPanel, MatExpansionPanelHeader,
+  MatExpansionPanelTitle, MatAccordion
+} from '@angular/material/expansion';
 import { TranslateDirective, TranslatePipe } from '@ngx-translate/core';
 import { firstValueFrom } from 'rxjs';
 
@@ -20,7 +23,10 @@ import { ToolBarComponent } from '@mm-components/tool-bar/tool-bar.component';
 
 declare const medicmobile_android: any;
 
-type SyncState = 'idle' | 'starting' | 'syncing' | 'completed' | 'failed' | 'stopping' | 'scanning' | 'waiting' | 'connecting' | 'waiting_wifi' | 'stopped' | 'preview' | 'peer_connected';
+type SyncState =
+  'idle' | 'starting' | 'syncing' | 'completed' | 'failed' |
+  'stopping' | 'scanning' | 'waiting' | 'connecting' |
+  'waiting_wifi' | 'stopped' | 'preview' | 'peer_connected';
 
 const SYNC_LOG_ID = '_local/p2p-sync-log';
 const RELAY_LOG_ID = '_local/p2p-relay-log';
@@ -361,7 +367,7 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
         return false;
       }
       return true;
-    } catch (err) {
+    } catch (_err) {
       return true;
     }
   }
@@ -472,7 +478,9 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
   }
 
   retrySync() {
-    if (!this.hasBridgeAvailable) return;
+    if (!this.hasBridgeAvailable) {
+      return;
+    }
     this.lastError = null;
     try {
       const raw = (window as any).medicmobile_android.p2pRetrySync();
@@ -660,7 +668,7 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
             this.syncState = 'connecting';
             this.startStatusPolling();
           }
-        } catch (err) {
+        } catch (_err) {
           // Not connected yet, keep polling
         }
       });
@@ -786,7 +794,11 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
   }
 
   get isSyncing(): boolean {
-    return this.syncState === 'syncing' || this.syncState === 'starting' || this.syncState === 'waiting' || this.syncState === 'scanning' || this.syncState === 'connecting' || this.syncState === 'waiting_wifi' || this.syncState === 'preview' || this.syncState === 'peer_connected';
+    const activeStates: SyncState[] = [
+      'syncing', 'starting', 'waiting', 'scanning',
+      'connecting', 'waiting_wifi', 'preview', 'peer_connected',
+    ];
+    return activeStates.includes(this.syncState);
   }
 
   get canStart(): boolean {

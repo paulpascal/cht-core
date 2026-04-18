@@ -108,10 +108,12 @@ export class HeaderComponent extends BaseMenuComponent implements OnInit, OnDest
   private async checkP2pVisibility() {
     try {
       const config = await this.p2pConfigService.getConfig();
-      if (!config.enabled) return;
+      if (!config.enabled) {
+        return;
+      }
       const role = await this.p2pConfigService.getUserP2pRole();
       this.p2pVisible = role !== null;
-    } catch (e) {
+    } catch (_e) {
       // Keep hidden on error
     }
   }
