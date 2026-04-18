@@ -83,7 +83,8 @@ describe('P2P authorize', () => {
     });
     config.get.withArgs('p2p_sync').returns({
       enabled: true,
-      allowed_roles: ['chw', 'chw_supervisor'],
+      host_roles: ['chw_supervisor'],
+      peer_roles: ['chw'],
       token_expiry_days: 30,
     });
     config.get.withArgs('replication_depth').returns([

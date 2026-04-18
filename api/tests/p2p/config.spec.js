@@ -30,8 +30,8 @@ describe('P2P config', () => {
     expect(res.json.calledOnce).to.be.true;
     const result = res.json.args[0][0];
     expect(result.enabled).to.equal(false);
-    expect(result.host_roles).to.deep.equal(['chw_supervisor']);
-    expect(result.peer_roles).to.deep.equal(['chw']);
+    expect(result.host_roles).to.deep.equal([]);
+    expect(result.peer_roles).to.deep.equal([]);
     expect(result.max_doc_size_kb).to.equal(256);
     expect(result.token_expiry_days).to.equal(30);
     expect(result.wifi_hotspot_idle_timeout_sec).to.equal(300);
@@ -53,7 +53,7 @@ describe('P2P config', () => {
     expect(result.enabled).to.equal(true);
     expect(result.host_roles).to.deep.equal(['chw_supervisor', 'manager']);
     expect(result.max_doc_size_kb).to.equal(512);
-    expect(result.peer_roles).to.deep.equal(['chw']);
+    expect(result.peer_roles).to.deep.equal([]);
   });
 
   it('should return error when auth fails', async () => {
