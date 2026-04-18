@@ -18,6 +18,7 @@ import { AuthService } from '@mm-services/auth.service';
 import { GlobalActions } from '@mm-actions/global';
 import { LogoutConfirmComponent } from '@mm-modals/logout/logout-confirm.component';
 import { FeedbackComponent } from '@mm-modals/feedback/feedback.component';
+import { P2pConfigService } from '@mm-services/p2p-config.service';
 
 describe('SidebarMenuComponent', () => {
   let component: SidebarMenuComponent;
@@ -51,6 +52,16 @@ describe('SidebarMenuComponent', () => {
           { provide: DBSyncService, useValue: dbSyncService },
           { provide: ModalService, useValue: modalService },
           { provide: AuthService, useValue: authService },
+          {
+            provide: P2pConfigService,
+            useValue: {
+              getConfig: sinon.stub().resolves({ enabled: false }),
+              getUserP2pRole: sinon.stub().resolves(null),
+              isEnabled: sinon.stub().resolves(false),
+              shouldPauseReplicationDuringSync:
+                sinon.stub().resolves(false),
+            },
+          },
         ],
       })
       .compileComponents();
