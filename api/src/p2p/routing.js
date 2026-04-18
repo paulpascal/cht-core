@@ -16,10 +16,12 @@ const jsonParser = bodyParser.json({ limit: '1mb' });
  *
  * @param {import('express').Router} app - Express router
  */
-module.exports = (app) => {
+const registerP2pRoutes = (app) => {
   app.all('/api/v1/p2p/*path', authorization.setAuthorized);
   app.post('/api/v1/p2p/authorize', jsonParser, authorize);
   app.get('/api/v1/p2p/config/:facility_id', getConfig);
   app.post('/api/v1/p2p/telemetry', jsonParser, recordTelemetry);
   app.get('/api/v1/p2p/revocation-list', getRevocationList);
 };
+
+module.exports = registerP2pRoutes;

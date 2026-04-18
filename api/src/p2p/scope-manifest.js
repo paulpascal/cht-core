@@ -1,4 +1,4 @@
-const crypto = require('crypto');
+const crypto = require('node:crypto');
 const config = require('../config');
 
 const DEFAULT_SHARED_DOC_TYPES = [
@@ -20,24 +20,22 @@ const DEFAULT_SHARED_DOC_TYPES = [
  * @param {string[]} userSettings.roles - User's roles
  * @returns {Object} ScopeManifest per CONTRACT.md Section 3
  */
+const getMaxReplicationDepth = (userRoles) => {
+  const depthSettings = config.get('replication_depth') || [];
+  return depthSettings
+    .filter(setting => userRoles.includes(setting.role))
+    .map(setting => Number.parseInt(setting.depth, 10))
+    .filter(depth => !Number.isNaN(depth))
+    .reduce((max, depth) => Math.max(max, depth), 0);
+};
+
 const generateManifest = (userSettings) => {
-  if (!userSettings || !userSettings.facility_id) {
+  if (!userSettings?.facility_id) {
     throw new Error('User settings must include facility_id');
   }
 
-  const replicationDepthSettings = config.get('replication_depth') || [];
   const userRoles = userSettings.roles || [];
-
-  // Find the highest replication_depth across the user's roles
-  let replicationDepth = 0;
-  for (const setting of replicationDepthSettings) {
-    if (userRoles.includes(setting.role)) {
-      const depth = Number.parseInt(setting.depth, 10);
-      if (!Number.isNaN(depth) && depth > replicationDepth) {
-        replicationDepth = depth;
-      }
-    }
-  }
+  const replicationDepth = getMaxReplicationDepth(userRoles);
 
   return {
     facility_subtree_root: Array.isArray(userSettings.facility_id)

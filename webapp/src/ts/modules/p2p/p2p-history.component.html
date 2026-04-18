@@ -29,19 +29,19 @@
       <mat-card-content>
         <div class="p2p-stats-grid">
           <div>
-            <label translate>p2p.history.total_sessions</label>
+            <span class="p2p-label" translate>p2p.history.total_sessions</span>
             <p>{{ totalSessions }}</p>
           </div>
           <div>
-            <label translate>p2p.history.total_docs</label>
+            <span class="p2p-label" translate>p2p.history.total_docs</span>
             <p>{{ totalDocsSynced }}</p>
           </div>
           <div>
-            <label translate>p2p.history.total_bytes</label>
+            <span class="p2p-label" translate>p2p.history.total_bytes</span>
             <p>{{ formatBytes(totalBytesTransferred) }}</p>
           </div>
           <div *ngIf="isSupervisor && totalTransitDocs > 0">
-            <label translate>p2p.history.total_transit</label>
+            <span class="p2p-label" translate>p2p.history.total_transit</span>
             <p>{{ totalTransitDocs }}</p>
           </div>
         </div>
@@ -66,32 +66,32 @@
 
         <div class="p2p-session-details">
           <div>
-            <label translate>p2p.history.peer</label>
+            <span class="p2p-label" translate>p2p.history.peer</span>
             <p>{{ entry.peer }}</p>
           </div>
 
           <div>
-            <label translate>p2p.history.docs</label>
+            <span class="p2p-label" translate>p2p.history.docs</span>
             <p>{{ entry.docs_count }}</p>
           </div>
 
           <div *ngIf="entry.transit_count > 0">
-            <label translate>p2p.history.transit_docs</label>
+            <span class="p2p-label" translate>p2p.history.transit_docs</span>
             <p>{{ entry.transit_count }}</p>
           </div>
 
           <div>
-            <label translate>p2p.history.data_transferred</label>
+            <span class="p2p-label" translate>p2p.history.data_transferred</span>
             <p>{{ formatBytes(entry.bytes) }}</p>
           </div>
 
           <div>
-            <label translate>p2p.history.duration</label>
+            <span class="p2p-label" translate>p2p.history.duration</span>
             <p>{{ formatDuration(entry.started_at, entry.completed_at) }}</p>
           </div>
 
           <div>
-            <label translate>p2p.history.status</label>
+            <span class="p2p-label" translate>p2p.history.status</span>
             <mat-chip-set>
               <mat-chip [class]="getStatusClass(entry.status)">
                 {{ 'p2p.status.' + entry.status | translate }}
@@ -100,7 +100,7 @@
           </div>
 
           <div *ngIf="entry.error" class="p2p-error-detail">
-            <label translate>p2p.history.error</label>
+            <span class="p2p-label" translate>p2p.history.error</span>
             <p>{{ entry.error }}</p>
           </div>
         </div>

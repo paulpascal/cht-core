@@ -19,21 +19,21 @@ const DEFAULTS = {
 const getP2pConfig = () => {
   const p2pSettings = config.get('p2p_sync') || {};
   return {
-    enabled: p2pSettings.enabled !== undefined ? !!p2pSettings.enabled : DEFAULTS.enabled,
+    enabled: p2pSettings.enabled === undefined ? DEFAULTS.enabled : !!p2pSettings.enabled,
     host_roles: p2pSettings.host_roles || DEFAULTS.host_roles,
     peer_roles: p2pSettings.peer_roles || DEFAULTS.peer_roles,
     transit_relay: {
-      enabled: p2pSettings.transit_relay?.enabled !== undefined
-        ? !!p2pSettings.transit_relay.enabled
-        : DEFAULTS.transit_relay.enabled,
+      enabled: p2pSettings.transit_relay?.enabled === undefined
+        ? DEFAULTS.transit_relay.enabled
+        : !!p2pSettings.transit_relay.enabled,
       max_age_days: p2pSettings.transit_relay?.max_age_days || DEFAULTS.transit_relay.max_age_days,
     },
     max_doc_size_kb: p2pSettings.max_doc_size_kb || DEFAULTS.max_doc_size_kb,
     token_expiry_days: p2pSettings.token_expiry_days || DEFAULTS.token_expiry_days,
     wifi_hotspot_idle_timeout_sec: p2pSettings.wifi_hotspot_idle_timeout_sec || DEFAULTS.wifi_hotspot_idle_timeout_sec,
-    pause_replication_during_sync: p2pSettings.pause_replication_during_sync !== undefined
-      ? !!p2pSettings.pause_replication_during_sync
-      : DEFAULTS.pause_replication_during_sync,
+    pause_replication_during_sync: p2pSettings.pause_replication_during_sync === undefined
+      ? DEFAULTS.pause_replication_during_sync
+      : !!p2pSettings.pause_replication_during_sync,
   };
 };
 

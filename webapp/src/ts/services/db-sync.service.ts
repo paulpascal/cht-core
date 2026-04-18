@@ -92,8 +92,8 @@ export class DBSyncService {
     private translateService:TranslateService,
     private migrationsService:MigrationsService,
     private replicationService:ReplicationService,
-    private p2pConfigService:P2pConfigService,
-    private p2pTransitPurgeService:P2pTransitPurgeService,
+    private readonly p2pConfigService:P2pConfigService,
+    private readonly p2pTransitPurgeService:P2pTransitPurgeService,
   ) {
     this.globalActions = new GlobalActions(this.store);
   }
@@ -417,15 +417,16 @@ export class DBSyncService {
   */
   private isP2pActive(): boolean {
     try {
-      if (typeof medicmobile_android !== 'undefined' &&
-          typeof medicmobile_android.p2pIsActive === 'function') {
-        const result = JSON.parse(medicmobile_android.p2pIsActive());
-        return !!result.active;
+      if (typeof medicmobile_android === 'undefined' ||
+          typeof medicmobile_android.p2pIsActive !== 'function') {
+        return false;
       }
-    } catch (_err) {
-      // Bridge unavailable or parse error — assume not active
+      const result = JSON.parse(medicmobile_android.p2pIsActive());
+      return !!result.active;
+    } catch (err) {
+      console.debug('db-sync: P2P active check failed', err);
+      return false;
     }
-    return false;
   }
 
   async sync(force?, quick?) {
@@ -442,8 +443,8 @@ export class DBSyncService {
           console.log('db-sync: skipping sync cycle — P2P active and pause_replication_during_sync enabled');
           return Promise.resolve();
         }
-      } catch (_err) {
-        // Config unavailable — don't block sync
+      } catch (err) {
+        console.debug('db-sync: P2P config check failed', err);
       }
     }
 

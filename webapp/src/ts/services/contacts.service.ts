@@ -17,7 +17,7 @@ export class ContactsService {
     private cacheService:CacheService,
     private contactTypesService:ContactTypesService,
     private dbService:DbService,
-    private p2pTransitFilterService:P2pTransitFilterService,
+    private readonly p2pTransitFilterService:P2pTransitFilterService,
   ) {
     this.inited = this.init();
   }

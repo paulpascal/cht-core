@@ -34,8 +34,8 @@ export class P2pConfigService {
   private configCache: P2pSyncConfig | null = null;
 
   constructor(
-    private settingsService: SettingsService,
-    private sessionService: SessionService
+    private readonly settingsService: SettingsService,
+    private readonly sessionService: SessionService
   ) {}
 
   async getConfig(): Promise<P2pSyncConfig> {

@@ -21,9 +21,11 @@ interface SyncSession {
   docs_pushed: number;
   docs_pulled: number;
   bytes_transferred: number;
-  status: 'completed' | 'failed' | 'interrupted';
+  status: SessionStatus;
   error: string | null;
 }
+
+type SessionStatus = 'completed' | 'failed' | 'interrupted';
 
 interface RelaySession {
   session_id: string;
@@ -36,7 +38,7 @@ interface RelaySession {
   transit_count: number;
   rejected_count: number;
   bytes_received: number;
-  status: 'completed' | 'failed' | 'interrupted';
+  status: SessionStatus;
 }
 
 interface HistoryEntry {
@@ -48,7 +50,7 @@ interface HistoryEntry {
   docs_count: number;
   transit_count: number;
   bytes: number;
-  status: 'completed' | 'failed' | 'interrupted';
+  status: SessionStatus;
   error: string | null;
 }
 
@@ -83,8 +85,8 @@ export class P2pHistoryComponent implements OnInit {
   totalTransitDocs = 0;
 
   constructor(
-    private dbService: DbService,
-    private p2pConfigService: P2pConfigService
+    private readonly dbService: DbService,
+    private readonly p2pConfigService: P2pConfigService
   ) {}
 
   async ngOnInit() {
@@ -93,61 +95,63 @@ export class P2pHistoryComponent implements OnInit {
     this.loadHistory();
   }
 
+  private mapSyncSession(s: SyncSession): HistoryEntry {
+    return {
+      session_id: s.session_id,
+      type: 'sync',
+      peer: s.peer_user || s.peer_device_id,
+      started_at: s.started_at,
+      completed_at: s.completed_at,
+      docs_count: (s.docs_pushed || 0) + (s.docs_pulled || 0),
+      transit_count: 0,
+      bytes: s.bytes_transferred || 0,
+      status: s.status,
+      error: s.error || null,
+    };
+  }
+
+  private mapRelaySession(s: RelaySession): HistoryEntry {
+    return {
+      session_id: s.session_id,
+      type: 'relay',
+      peer: s.source_user || s.source_device_id,
+      started_at: s.started_at,
+      completed_at: s.completed_at,
+      docs_count: s.docs_received || 0,
+      transit_count: s.transit_count || 0,
+      bytes: s.bytes_received || 0,
+      status: s.status,
+      error: null,
+    };
+  }
+
+  private async loadLogEntries<T>(
+    logId: string, mapper: (s: T) => HistoryEntry, label: string
+  ): Promise<HistoryEntry[]> {
+    try {
+      const db = this.dbService.get();
+      const log = await db.get(logId);
+      const sessions: T[] = log.sessions || [];
+      return sessions.map(mapper);
+    } catch (err: any) {
+      if (err.status !== 404) {
+        console.error(`P2pHistory: failed to load ${label}`, err);
+      }
+      return [];
+    }
+  }
+
   private async loadHistory() {
     this.loading = true;
-    const entries: HistoryEntry[] = [];
 
-    // Load CHW sync log
-    try {
-      const db = this.dbService.get();
-      const syncLog = await db.get(SYNC_LOG_ID);
-      const sessions: SyncSession[] = syncLog.sessions || [];
-      for (const s of sessions) {
-        entries.push({
-          session_id: s.session_id,
-          type: 'sync',
-          peer: s.peer_user || s.peer_device_id,
-          started_at: s.started_at,
-          completed_at: s.completed_at,
-          docs_count: (s.docs_pushed || 0) + (s.docs_pulled || 0),
-          transit_count: 0,
-          bytes: s.bytes_transferred || 0,
-          status: s.status,
-          error: s.error || null,
-        });
-      }
-    } catch (err: any) {
-      if (err.status !== 404) {
-        console.error('P2pHistory: failed to load sync log', err);
-      }
-    }
+    const syncEntries = await this.loadLogEntries<SyncSession>(
+      SYNC_LOG_ID, s => this.mapSyncSession(s), 'sync log'
+    );
+    const relayEntries = await this.loadLogEntries<RelaySession>(
+      RELAY_LOG_ID, s => this.mapRelaySession(s), 'relay log'
+    );
 
-    // Load supervisor relay log
-    try {
-      const db = this.dbService.get();
-      const relayLog = await db.get(RELAY_LOG_ID);
-      const sessions: RelaySession[] = relayLog.sessions || [];
-      for (const s of sessions) {
-        entries.push({
-          session_id: s.session_id,
-          type: 'relay',
-          peer: s.source_user || s.source_device_id,
-          started_at: s.started_at,
-          completed_at: s.completed_at,
-          docs_count: s.docs_received || 0,
-          transit_count: s.transit_count || 0,
-          bytes: s.bytes_received || 0,
-          status: s.status,
-          error: null,
-        });
-      }
-    } catch (err: any) {
-      if (err.status !== 404) {
-        console.error('P2pHistory: failed to load relay log', err);
-      }
-    }
-
-    // Sort by most recent first
+    const entries = [...syncEntries, ...relayEntries];
     entries.sort((a, b) => b.started_at - a.started_at);
 
     this.history = entries;

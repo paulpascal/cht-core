@@ -56,7 +56,7 @@ export class SidebarMenuComponent extends BaseMenuComponent implements OnInit, O
     protected modalService: ModalService,
     private router: Router,
     protected readonly storageInfoService: StorageInfoService,
-    private p2pConfigService: P2pConfigService,
+    private readonly p2pConfigService: P2pConfigService,
   ) {
     super(store, dbSyncService, modalService, storageInfoService);
     this.globalActions = new GlobalActions(store);
@@ -150,8 +150,8 @@ export class SidebarMenuComponent extends BaseMenuComponent implements OnInit, O
       const role = await this.p2pConfigService.getUserP2pRole();
       this.p2pVisible = role !== null;
       this.setSecondaryOptions();
-    } catch (_e) {
-      // Keep hidden on error
+    } catch (err) {
+      console.debug('SidebarMenu: P2P visibility check failed', err);
     }
   }
 

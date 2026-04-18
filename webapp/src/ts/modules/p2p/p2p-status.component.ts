@@ -30,6 +30,7 @@ type SyncState =
 
 const SYNC_LOG_ID = '_local/p2p-sync-log';
 const RELAY_LOG_ID = '_local/p2p-relay-log';
+const ERROR_NOT_INITIALIZED = 'p2p.error.not_initialized';
 
 interface SyncSession {
   session_id: string;
@@ -40,9 +41,11 @@ interface SyncSession {
   docs_pushed: number;
   docs_pulled: number;
   bytes_transferred: number;
-  status: 'completed' | 'failed' | 'interrupted';
+  status: SessionStatus;
   error: string | null;
 }
+
+type SessionStatus = 'completed' | 'failed' | 'interrupted';
 
 interface RelaySession {
   session_id: string;
@@ -55,7 +58,7 @@ interface RelaySession {
   transit_count: number;
   rejected_count: number;
   bytes_received: number;
-  status: 'completed' | 'failed' | 'interrupted';
+  status: SessionStatus;
 }
 
 interface HistoryEntry {
@@ -67,7 +70,7 @@ interface HistoryEntry {
   docs_count: number;
   transit_count: number;
   bytes: number;
-  status: 'completed' | 'failed' | 'interrupted';
+  status: SessionStatus;
   error: string | null;
 }
 
@@ -146,14 +149,14 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
   private bridgeInitializing = false;
 
   constructor(
-    private ngZone: NgZone,
-    private dbService: DbService,
-    private dbSyncService: DBSyncService,
-    private http: HttpClient,
-    private p2pConfigService: P2pConfigService,
-    private sessionService: SessionService,
-    private transitFilterService: P2pTransitFilterService,
-    private transitPurgeService: P2pTransitPurgeService
+    private readonly ngZone: NgZone,
+    private readonly dbService: DbService,
+    private readonly dbSyncService: DBSyncService,
+    private readonly http: HttpClient,
+    private readonly p2pConfigService: P2pConfigService,
+    private readonly sessionService: SessionService,
+    private readonly transitFilterService: P2pTransitFilterService,
+    private readonly transitPurgeService: P2pTransitPurgeService
   ) {}
 
   async ngOnInit() {
@@ -281,7 +284,8 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
     try {
       const existing: any = await db.get(id);
       await db.put({ ...existing, config, cached_at: Date.now() });
-    } catch {
+    } catch (err) {
+      console.debug('P2pStatus: no existing cache doc, creating new', err);
       await db.put({ _id: id, config, cached_at: Date.now() });
     }
   }
@@ -291,7 +295,8 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
     try {
       const doc: any = await db.get('_local/p2p-init-cache');
       return doc.config;
-    } catch {
+    } catch (err) {
+      console.debug('P2pStatus: no cached init config found', err);
       return null;
     }
   }
@@ -338,6 +343,25 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
     }
   }
 
+  private handleIncapableDevice(cap: any): boolean {
+    if (cap.capability === 'permission_needed') {
+      if (typeof medicmobile_android.getP2pPermissions === 'function') {
+        medicmobile_android.getP2pPermissions();
+      }
+      this.lastError = 'p2p.error.permission_needed';
+      this.syncState = 'idle';
+      return false;
+    }
+    if (cap.capability === 'location_services_off') {
+      this.lastError = cap.reason;
+      this.syncState = 'idle';
+      return false;
+    }
+    this.lastError = cap.reason || cap.capability;
+    this.syncState = 'failed';
+    return false;
+  }
+
   private checkAndRequestPermissions(): boolean {
     if (!this.hasBridgeAvailable) {
       return false;
@@ -348,26 +372,12 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
       }
       const raw = medicmobile_android.p2pGetCapability();
       const cap = JSON.parse(raw);
-      if (!cap.capable && cap.capability === 'permission_needed') {
-        if (typeof medicmobile_android.getP2pPermissions === 'function') {
-          medicmobile_android.getP2pPermissions();
-        }
-        this.lastError = 'p2p.error.permission_needed';
-        this.syncState = 'idle';
-        return false;
-      }
-      if (!cap.capable && cap.capability === 'location_services_off') {
-        this.lastError = cap.reason;
-        this.syncState = 'idle';
-        return false;
-      }
       if (!cap.capable) {
-        this.lastError = cap.reason || cap.capability;
-        this.syncState = 'failed';
-        return false;
+        return this.handleIncapableDevice(cap);
       }
       return true;
-    } catch (_err) {
+    } catch (err) {
+      console.debug('P2pStatus: capability check failed', err);
       return true;
     }
   }
@@ -377,7 +387,7 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
       return;
     }
     if (!await this.ensureBridgeInitialized()) {
-      this.lastError = 'p2p.error.not_initialized';
+      this.lastError = ERROR_NOT_INITIALIZED;
       return;
     }
     this.syncState = 'starting';
@@ -401,7 +411,9 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
             const qr = JSON.parse(result.qr_payload);
             this.hotspotSsid = qr.ssid || null;
             this.hotspotPassword = qr.pwd || null;
-          } catch (_) { /* ignore parse error */ }
+          } catch (err) {
+            console.debug('P2pStatus: QR payload parse failed', err);
+          }
         }
         this.startStatusPolling();
       } else {
@@ -420,7 +432,7 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
       return;
     }
     if (!await this.ensureBridgeInitialized()) {
-      this.lastError = 'p2p.error.not_initialized';
+      this.lastError = ERROR_NOT_INITIALIZED;
       return;
     }
     this.syncState = 'scanning';
@@ -682,6 +694,38 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
     }
   }
 
+  private applyStatusUpdate(status: any) {
+    this.hotspotActive = status.hotspot_active || false;
+    this.connectedPeers = status.connected_peers || [];
+    this.docsSynced = status.docs_synced || 0;
+    this.totalDocs = status.total_docs || 0;
+    this.bytesTransferred = status.bytes_transferred || 0;
+    if (status.qr_code_data_url) {
+      this.qrCodeDataUrl = status.qr_code_data_url;
+    }
+    if (status.error) {
+      this.lastError = status.error;
+    }
+  }
+
+  private handlePollStateTransitions(rawState: string, status: any) {
+    if (rawState === 'preview') {
+      this.previewContacts = status.preview_contacts || 0;
+      this.previewReports = status.preview_reports || 0;
+      this.previewTotal = status.preview_total || 0;
+      this.stopStatusPolling();
+      return;
+    }
+    if (this.syncState === 'syncing') {
+      this.transitDocCount = this.transitFilterService.getTransitDocCount();
+    }
+    if (this.syncState === 'completed' || this.syncState === 'failed' || this.syncState === 'idle') {
+      this.stopStatusPolling();
+      this.loadTransitStats();
+      this.loadHistory();
+    }
+  }
+
   private pollStatus() {
     this.ngZone.run(() => {
       if (!this.hasBridgeAvailable || typeof medicmobile_android.p2pGetStatus !== 'function') {
@@ -692,7 +736,6 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
         const status = JSON.parse(raw);
         const rawState = status.state || 'idle';
 
-        // Handle waiting_wifi: auto-connect failed, switch to connection polling
         if (rawState === 'waiting_wifi' && this.syncState !== 'waiting_wifi') {
           this.syncState = 'waiting_wifi';
           this.stopStatusPolling();
@@ -701,33 +744,8 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
         }
 
         this.syncState = rawState as SyncState;
-        this.hotspotActive = status.hotspot_active || false;
-        this.connectedPeers = status.connected_peers || [];
-        this.docsSynced = status.docs_synced || 0;
-        this.totalDocs = status.total_docs || 0;
-        this.bytesTransferred = status.bytes_transferred || 0;
-        if (status.qr_code_data_url) {
-          this.qrCodeDataUrl = status.qr_code_data_url;
-        }
-        if (status.error) {
-          this.lastError = status.error;
-        }
-        // Handle preview state — extract counts for staging view
-        if (rawState === 'preview') {
-          this.previewContacts = status.preview_contacts || 0;
-          this.previewReports = status.preview_reports || 0;
-          this.previewTotal = status.preview_total || 0;
-          this.stopStatusPolling();
-          return;
-        }
-        if (this.syncState === 'syncing') {
-          this.transitDocCount = this.transitFilterService.getTransitDocCount();
-        }
-        if (this.syncState === 'completed' || this.syncState === 'failed' || this.syncState === 'idle') {
-          this.stopStatusPolling();
-          this.loadTransitStats();
-          this.loadHistory();
-        }
+        this.applyStatusUpdate(status);
+        this.handlePollStateTransitions(rawState, status);
       } catch (err) {
         console.debug('P2pStatus: poll failed', err);
       }
@@ -742,6 +760,29 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
    * Restore active P2P state from bridge (survives page navigation).
    * If sync is already running in the Java layer, pick up the current state.
    */
+  private restoreWifiAndPreview(status: any, state: string) {
+    if (status.hotspot_ssid) {
+      this.hotspotSsid = status.hotspot_ssid;
+    }
+    if (status.hotspot_password) {
+      this.hotspotPassword = status.hotspot_password;
+    }
+    if (state === 'preview') {
+      this.previewContacts = status.preview_contacts || 0;
+      this.previewReports = status.preview_reports || 0;
+      this.previewTotal = status.preview_total || 0;
+    }
+  }
+
+  private resumePollingForState(state: string) {
+    const statusPollStates = ['waiting', 'syncing', 'connecting', 'scanning'];
+    if (state === 'waiting_wifi') {
+      this.startConnectionPolling();
+    } else if (statusPollStates.includes(state)) {
+      this.startStatusPolling();
+    }
+  }
+
   private restoreActiveState() {
     if (!this.hasBridgeAvailable || typeof medicmobile_android.p2pGetStatus !== 'function') {
       return;
@@ -750,37 +791,14 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
       const raw = medicmobile_android.p2pGetStatus();
       const status = JSON.parse(raw);
       const state = status.state || 'idle';
-      if (state !== 'idle') {
-        this.syncState = state as SyncState;
-        this.hotspotActive = status.hotspot_active || false;
-        this.connectedPeers = status.connected_peers || [];
-        this.docsSynced = status.docs_synced || 0;
-        this.totalDocs = status.total_docs || 0;
-        this.bytesTransferred = status.bytes_transferred || 0;
-        if (status.qr_code_data_url) {
-          this.qrCodeDataUrl = status.qr_code_data_url;
-        }
-        // Restore WiFi credentials from hotspot status
-        if (status.hotspot_ssid) {
-          this.hotspotSsid = status.hotspot_ssid;
-        }
-        if (status.hotspot_password) {
-          this.hotspotPassword = status.hotspot_password;
-        }
-        // Restore preview counts if in preview state
-        if (state === 'preview') {
-          this.previewContacts = status.preview_contacts || 0;
-          this.previewReports = status.preview_reports || 0;
-          this.previewTotal = status.preview_total || 0;
-        }
-        // Resume polling if active
-        if (state === 'waiting_wifi') {
-          this.startConnectionPolling();
-        } else if (state === 'waiting' || state === 'syncing' || state === 'connecting' || state === 'scanning') {
-          this.startStatusPolling();
-        }
-        console.info('P2pStatus: restored active state:', state);
+      if (state === 'idle') {
+        return;
       }
+      this.syncState = state as SyncState;
+      this.applyStatusUpdate(status);
+      this.restoreWifiAndPreview(status, state);
+      this.resumePollingForState(state);
+      console.info('P2pStatus: restored active state:', state);
     } catch (err) {
       console.debug('P2pStatus: could not restore state', err);
     }
@@ -807,58 +825,63 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
 
   // --- History ---
 
+  private mapSyncSession(s: SyncSession): HistoryEntry {
+    return {
+      session_id: s.session_id,
+      type: 'sync',
+      peer: s.peer_user || s.peer_device_id,
+      started_at: s.started_at,
+      completed_at: s.completed_at,
+      docs_count: (s.docs_pushed || 0) + (s.docs_pulled || 0),
+      transit_count: 0,
+      bytes: s.bytes_transferred || 0,
+      status: s.status,
+      error: s.error || null,
+    };
+  }
+
+  private mapRelaySession(s: RelaySession): HistoryEntry {
+    return {
+      session_id: s.session_id,
+      type: 'relay',
+      peer: s.source_user || s.source_device_id,
+      started_at: s.started_at,
+      completed_at: s.completed_at,
+      docs_count: s.docs_received || 0,
+      transit_count: s.transit_count || 0,
+      bytes: s.bytes_received || 0,
+      status: s.status,
+      error: null,
+    };
+  }
+
+  private async loadLogEntries<T>(
+    logId: string, mapper: (s: T) => HistoryEntry, label: string
+  ): Promise<HistoryEntry[]> {
+    try {
+      const db = this.dbService.get();
+      const log = await db.get(logId);
+      const sessions: T[] = log.sessions || [];
+      return sessions.map(mapper);
+    } catch (err: any) {
+      if (err.status !== 404) {
+        console.error(`P2pStatus: failed to load ${label}`, err);
+      }
+      return [];
+    }
+  }
+
   async loadHistory() {
     this.historyLoading = true;
-    const entries: HistoryEntry[] = [];
 
-    try {
-      const db = this.dbService.get();
-      const syncLog = await db.get(SYNC_LOG_ID);
-      const sessions: SyncSession[] = syncLog.sessions || [];
-      for (const s of sessions) {
-        entries.push({
-          session_id: s.session_id,
-          type: 'sync',
-          peer: s.peer_user || s.peer_device_id,
-          started_at: s.started_at,
-          completed_at: s.completed_at,
-          docs_count: (s.docs_pushed || 0) + (s.docs_pulled || 0),
-          transit_count: 0,
-          bytes: s.bytes_transferred || 0,
-          status: s.status,
-          error: s.error || null,
-        });
-      }
-    } catch (err: any) {
-      if (err.status !== 404) {
-        console.error('P2pStatus: failed to load sync log', err);
-      }
-    }
+    const syncEntries = await this.loadLogEntries<SyncSession>(
+      SYNC_LOG_ID, s => this.mapSyncSession(s), 'sync log'
+    );
+    const relayEntries = await this.loadLogEntries<RelaySession>(
+      RELAY_LOG_ID, s => this.mapRelaySession(s), 'relay log'
+    );
 
-    try {
-      const db = this.dbService.get();
-      const relayLog = await db.get(RELAY_LOG_ID);
-      const sessions: RelaySession[] = relayLog.sessions || [];
-      for (const s of sessions) {
-        entries.push({
-          session_id: s.session_id,
-          type: 'relay',
-          peer: s.source_user || s.source_device_id,
-          started_at: s.started_at,
-          completed_at: s.completed_at,
-          docs_count: s.docs_received || 0,
-          transit_count: s.transit_count || 0,
-          bytes: s.bytes_received || 0,
-          status: s.status,
-          error: null,
-        });
-      }
-    } catch (err: any) {
-      if (err.status !== 404) {
-        console.error('P2pStatus: failed to load relay log', err);
-      }
-    }
-
+    const entries = [...syncEntries, ...relayEntries];
     entries.sort((a, b) => b.started_at - a.started_at);
     this.history = entries;
     this.computeStats();

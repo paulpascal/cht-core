@@ -1,4 +1,4 @@
-const crypto = require('crypto');
+const crypto = require('node:crypto');
 const auth = require('../auth');
 const db = require('../db');
 const logger = require('@medic/logger');
@@ -164,16 +164,11 @@ const buildPayload = (userSettings, facilityPath) => {
  */
 const getReplicationDepth = (roles) => {
   const depthSettings = config.get('replication_depth') || [];
-  let maxDepth = 0;
-  for (const setting of depthSettings) {
-    if (roles.includes(setting.role)) {
-      const depth = Number.parseInt(setting.depth, 10);
-      if (!Number.isNaN(depth) && depth > maxDepth) {
-        maxDepth = depth;
-      }
-    }
-  }
-  return maxDepth;
+  return depthSettings
+    .filter(setting => roles.includes(setting.role))
+    .map(setting => Number.parseInt(setting.depth, 10))
+    .filter(depth => !Number.isNaN(depth))
+    .reduce((max, depth) => Math.max(max, depth), 0);
 };
 
 /**
@@ -197,25 +192,28 @@ const getPermissions = (roles, p2pConfig) => {
 /**
  * Build facility path (array of ancestor facility IDs) by walking the contact hierarchy.
  */
+const fetchParentId = async (currentId) => {
+  try {
+    const doc = await db.medic.get(currentId);
+    return doc.parent?._id || null;
+  } catch (err) {
+    logger.warn('Could not fetch facility %s for path: %o', currentId, err);
+    return null;
+  }
+};
+
 const getFacilityPath = async (facilityId) => {
-  const resolved = Array.isArray(facilityId) ? facilityId[0] : facilityId;
   const path = [];
-  let currentId = resolved;
+  let currentId = Array.isArray(facilityId) ? facilityId[0] : facilityId;
 
   // Walk up to 5 levels to prevent infinite loops
   for (let i = 0; i < 5 && currentId; i++) {
-    try {
-      const doc = await db.medic.get(currentId);
-      if (doc.parent && doc.parent._id) {
-        path.unshift(doc.parent._id);
-        currentId = doc.parent._id;
-      } else {
-        break;
-      }
-    } catch (err) {
-      logger.warn('Could not fetch facility %s for path: %o', currentId, err);
+    const parentId = await fetchParentId(currentId);
+    if (!parentId) {
       break;
     }
+    path.unshift(parentId);
+    currentId = parentId;
   }
 
   return path;
@@ -245,8 +243,8 @@ const authorize = async (req, res) => {
     // 4. Check user's role is allowed (host or peer)
     const hostRoles = p2pConfig.host_roles || [];
     const peerRoles = p2pConfig.peer_roles || [];
-    const allowedRoles = [...hostRoles, ...peerRoles];
-    const hasAllowedRole = (userSettings.roles || []).some(role => allowedRoles.includes(role));
+    const allowedRoles = new Set([...hostRoles, ...peerRoles]);
+    const hasAllowedRole = (userSettings.roles || []).some(role => allowedRoles.has(role));
     if (!hasAllowedRole) {
       return serverUtils.error({ code: 403, message: 'User role not authorized for P2P sync' }, req, res);
     }

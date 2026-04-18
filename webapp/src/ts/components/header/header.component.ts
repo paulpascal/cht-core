@@ -62,7 +62,7 @@ export class HeaderComponent extends BaseMenuComponent implements OnInit, OnDest
     protected readonly storageInfoService: StorageInfoService,
     private settingsService: SettingsService,
     private headerTabsService: HeaderTabsService,
-    private p2pConfigService: P2pConfigService,
+    private readonly p2pConfigService: P2pConfigService,
   ) {
     super(store, dbSyncService, modalService, storageInfoService);
   }
@@ -113,8 +113,8 @@ export class HeaderComponent extends BaseMenuComponent implements OnInit, OnDest
       }
       const role = await this.p2pConfigService.getUserP2pRole();
       this.p2pVisible = role !== null;
-    } catch (_e) {
-      // Keep hidden on error
+    } catch (err) {
+      console.debug('HeaderComponent: P2P visibility check failed', err);
     }
   }
 }
