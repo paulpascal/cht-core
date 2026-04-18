@@ -3,6 +3,9 @@ import { Router } from '@angular/router';
 import { Store } from '@ngrx/store';
 import { Subscription } from 'rxjs';
 
+const constants = require('@medic/constants');
+const DOC_IDS = constants.DOC_IDS;
+
 import { DbService } from '@mm-services/db.service';
 import { ResourceIconsService } from '@mm-services/resource-icons.service';
 import { Selectors } from '@mm-selectors/index';
@@ -14,7 +17,7 @@ import { ToolBarComponent } from '@mm-components/tool-bar/tool-bar.component';
 import { MatCard, MatCardHeader, MatCardTitle, MatCardContent, MatCardSubtitle } from '@angular/material/card';
 import { TranslateDirective, TranslatePipe } from '@ngx-translate/core';
 import { MatButton } from '@angular/material/button';
-import { NgSwitch, NgSwitchCase, NgIf, NgFor, DecimalPipe } from '@angular/common';
+import { DecimalPipe } from '@angular/common';
 import { PartnerImagePipe } from '@mm-pipes/resource-icon.pipe';
 import { SimpleDateTimePipe } from '@mm-pipes/date.pipe';
 
@@ -28,11 +31,7 @@ import { SimpleDateTimePipe } from '@mm-pipes/date.pipe';
     TranslateDirective,
     MatCardContent,
     MatButton,
-    NgSwitch,
-    NgSwitchCase,
-    NgIf,
     MatCardSubtitle,
-    NgFor,
     DecimalPipe,
     TranslatePipe,
     PartnerImagePipe,
@@ -98,7 +97,7 @@ export class AboutComponent implements OnInit, OnDestroy {
 
   private getPartners() {
     this.resourceIconsService
-      .getDocResources('partners')
+      .getDocResources(DOC_IDS.PARTNERS)
       .then(partners => this.partners = partners)
       .catch(error => {
         if (error.status !== 404) { // Partners doc is not compulsory.

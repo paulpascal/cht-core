@@ -15,6 +15,7 @@ const targetAggregatesConfig = require('./config/target-aggregates');
 const { getTelemetry, destroyTelemetryDb } = require('@utils/telemetry');
 const constants = require('@constants');
 const { createTargetDoc, getLastMonth } = require('./utils/targets-helper-functions');
+const { PREFIXES } = require('@medic/constants');
 
 describe('Target aggregates', () => {
   describe('DB admin', () => {
@@ -74,7 +75,7 @@ describe('Target aggregates', () => {
     const onlineUser = userFactory.build({ place: districtHospital1._id, roles: ['program_officer'] });
 
     const userWithManyPlaces = userSettingsFactory.build({
-      _id: 'org.couchdb.user:offline_many_facilities',
+      _id: PREFIXES.COUCH_USER + 'offline_many_facilities',
       name: 'offline_many_facilities',
       roles: [ 'chw' ],
       facility_id: [ districtHospital1._id, districtHospital2._id ],
@@ -103,7 +104,7 @@ describe('Target aggregates', () => {
       districtHospital2._id,
       ...contactDocs.map(doc => doc._id),
       'fixture:user:supervisor',
-      'org.couchdb.user:supervisor',
+      PREFIXES.COUCH_USER + 'supervisor',
       '^target~',
       [/^form:/],
     ];
@@ -354,12 +355,7 @@ describe('Target aggregates', () => {
       it('should display only the targets sections and show the correct message ' +
         'when target aggregates are disabled', async () => {
         await browser.url('/#/analytics/target-aggregates');
-
-        const emptySelection = await analyticsPage.noSelectedTarget();
-        await (emptySelection).waitForDisplayed();
-        await commonPage.waitForLoaderToDisappear(emptySelection);
-
-        expect(await emptySelection.getText()).to.equal('Target aggregates are disabled');
+        await analyticsPage.disabledTargetAggregates().waitForDisplayed();
         expect(await targetAggregatesPage.getFilterCount()).to.equal(0);
       });
 

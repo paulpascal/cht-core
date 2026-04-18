@@ -11,7 +11,7 @@ const placeFactory = require('@factories/cht/contacts/place');
 const personFactory = require('@factories/cht/contacts/person');
 const chtConfUtils = require('@utils/cht-conf');
 const chtDbUtils = require('@utils/cht-db');
-const { CONTACT_TYPES } = require('@medic/constants');
+const { CONTACT_TYPES, PREFIXES } = require('@medic/constants');
 const { getTelemetry, destroyTelemetryDb } = require('@utils/telemetry');
 const { createTargetDoc, REPORTING_PERIOD, getLastMonth } = require('./utils/targets-helper-functions');
 const { TARGET_MET_COLOR, TARGET_UNMET_COLOR } = analyticsPage;
@@ -35,7 +35,7 @@ describe('Targets', () => {
   const chw = userFactory.build({ place: healthCenter._id, contact: contact });
 
   const previousMonthTargets = createTargetDoc(REPORTING_PERIOD.PREVIOUS, contact._id, {
-    user: `org.couchdb.user:${chw.username}`,
+    user: `${PREFIXES.COUCH_USER}${chw.username}`,
     targets: [
       {
         id: 'deaths-this-month',
@@ -133,36 +133,28 @@ describe('Targets', () => {
 
   xit('should display correct message when no target found', async () => {
     const settings = await compileTargets();
-    await utils.updateSettings(settings, { ignoreReload: 'api', sync: true, refresh: true, revert: true  });
+    await utils.updateSettings(settings, { ignoreReload: true, sync: true, refresh: true, revert: true  });
 
     await analyticsPage.goToTargets();
+    await commonPage.waitForLoaders();
 
-    const emptySelection = await analyticsPage.noSelectedTarget();
-    await (emptySelection).waitForDisplayed();
-    await commonPage.waitForLoaderToDisappear(emptySelection);
-
-    expect(await emptySelection.getText()).to.equal('No target found.');
+    await browser.waitUntil(async () => (await analyticsPage.noTargetFound().isDisplayed()) === true);
   });
 
   xit('should display correct message when targets are disabled', async () => {
     const tasks = {
       targets: { enabled: false }
     };
-    await utils.updateSettings({ tasks }, { ignoreReload: 'api', sync: true, refresh: true, revert: true  });
+    await utils.updateSettings({ tasks }, { ignoreReload: true, sync: true, refresh: true, revert: true  });
     await analyticsPage.goToTargets();
+    await commonPage.waitForLoaders();
 
-    const emptySelection = await analyticsPage.noSelectedTarget();
-    await (emptySelection).waitForDisplayed();
-    await commonPage.waitForLoaderToDisappear(emptySelection);
-
-    expect(await emptySelection.getText()).to.equal(
-      'Targets are disabled for admin users. If you need to see targets, login as a normal user.'
-    );
+    await browser.waitUntil(async () => (await analyticsPage.noAdminTargets().isDisplayed()) === true);
   });
 
   xit('should show error message for bad config', async () => {
     const settings = await compileTargets('targets-error-config.js');
-    await utils.updateSettings(settings, { ignoreReload: 'api', sync: true, refresh: true, revert: true  });
+    await utils.updateSettings(settings, { ignoreReload: true, sync: true, refresh: true, revert: true  });
     await analyticsPage.goToTargets();
 
     const { errorMessage, url, username, errorStack } = await commonPage.getErrorLog();

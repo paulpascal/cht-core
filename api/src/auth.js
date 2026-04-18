@@ -5,9 +5,10 @@ const environment = require('@medic/environment');
 const config = require('./config');
 const dataContext = require('./services/data-context');
 const { roles, users } = require('@medic/user-management')(config, db, dataContext);
-
+const { PermissionError } = require('./errors');
 const contentLengthRegex = /^content-length$/i;
 const contentTypeRegex = /^content-type$/i;
+const { HTTP_HEADERS } = require('@medic/constants');
 
 const get = (path, headers) => {
   const getHeaders = { ...headers };
@@ -32,6 +33,19 @@ const hasPermission = (userCtx, permission) => {
   return _.some(roles, role => _.includes(userCtx.roles, role));
 };
 
+const assertPermissions = async (req, { isOnline = false, hasAll = [], hasAny = [] }) => {
+  const userCtx = await module.exports.getUserCtx(req);
+  const onlineUserPass = isOnline === false || roles.isOnlineOnly(userCtx);
+  const hasAllPass = hasAll.length === 0 || module.exports.hasAllPermissions(userCtx, hasAll);
+  const hasAnyPass = hasAny.length === 0
+    || roles.isDbAdmin(userCtx)
+    || hasAny.some(perm => hasPermission(userCtx, perm));
+  if (!(onlineUserPass && hasAllPass && hasAnyPass)) {
+    throw new PermissionError('Insufficient privileges');
+  }
+  return userCtx;
+};
+
 module.exports = {
   isOnlineOnly: roles.isOnlineOnly,
   isDbAdmin: roles.isDbAdmin,
@@ -48,7 +62,6 @@ module.exports = {
     }
     return _.every(permissions, _.partial(hasPermission, userCtx));
   },
-
   getUserCtx: req => {
     return get('/_session', req.headers)
       .catch(err => {
@@ -59,23 +72,14 @@ module.exports = {
       })
       .then(auth => {
         if (auth?.userCtx?.name) {
-          req.headers['X-Medic-User'] = auth.userCtx.name;
+          req.headers[HTTP_HEADERS.MEDIC_USER] = auth.userCtx.name;
           return auth.userCtx;
         }
         throw { code: 500, message: 'Failed to authenticate' };
       });
   },
-
-  check: (req, permissions) => {
-    return module.exports
-      .getUserCtx(req)
-      .then(userCtx => {
-        if (!module.exports.hasAllPermissions(userCtx, permissions)) {
-          throw { code: 403, message: 'Insufficient privileges' };
-        }
-        return userCtx;
-      });
-  },
+  check: (req, permissions) => assertPermissions(req, { hasAll: permissions }),
+  assertPermissions,
 
   /**
    * Extract Basic Auth credentials from a request

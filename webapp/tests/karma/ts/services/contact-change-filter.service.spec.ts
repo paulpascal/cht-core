@@ -4,6 +4,7 @@ import sinon from 'sinon';
 
 import { ContactChangeFilterService } from '@mm-services/contact-change-filter.service';
 import { ContactTypesService } from '@mm-services/contact-types.service';
+import { DOC_TYPES } from '@medic/constants';
 
 describe('ContactChangeFilter service', () => {
 
@@ -53,7 +54,7 @@ describe('ContactChangeFilter service', () => {
       contactTypesIncludes.returns(false);
 
       const change1 = { doc: { parent: { _id: '123'} } };
-      const change2 = { doc: { parent: { _id: '123'}, type: 'data_record' } };
+      const change2 = { doc: { parent: { _id: '123'}, type: DOC_TYPES.DATA_RECORD } };
       const change3 = { doc: {} };
       const contact = { doc: { _id: '123' } };
 
@@ -192,7 +193,7 @@ describe('ContactChangeFilter service', () => {
       change1 = {
         doc: {
           form: 'a',
-          type: 'data_record',
+          type: DOC_TYPES.DATA_RECORD,
           fields: {}
         }
       };
@@ -200,7 +201,7 @@ describe('ContactChangeFilter service', () => {
       change2 = {
         doc: {
           form: 'a',
-          type: 'data_record'
+          type: DOC_TYPES.DATA_RECORD
         }
       };
 
@@ -359,6 +360,85 @@ describe('ContactChangeFilter service', () => {
       expect(service.isRelevantReport(change2, contact)).to.equal(false);
       change2.doc.place_id = 'nchild_place3';
       expect(service.isRelevantReport(change2, contact)).to.equal(false);
+    });
+  });
+
+  describe('isRelevantChange', () => {
+    it('returns true when change matches contact directly', () => {
+      const change = { id: 'contact1', doc: { _id: 'contact1' } };
+      const contact = { doc: { _id: 'contact1' } };
+      expect(service.isRelevantChange(change, contact)).to.equal(true);
+    });
+
+    it('returns true when change is a relevant child contact', () => {
+      const change = { id: 'child1', doc: { _id: 'child1', type: 'person', parent: { _id: 'contact1' } } };
+      const contact = { doc: { _id: 'contact1' } };
+      expect(service.isRelevantChange(change, contact)).to.equal(true);
+    });
+
+    it('returns true when change is a relevant report for the contact', () => {
+      const change = {
+        id: 'report1',
+        doc: {
+          _id: 'report1',
+          form: 'stock_report',
+          type: DOC_TYPES.DATA_RECORD,
+          fields: { patient_id: 'contact1' }
+        }
+      };
+      const contact = { doc: { _id: 'contact1', patient_id: 'patient1' } };
+      contactTypesIncludes.returns(false);
+      expect(service.isRelevantChange(change, contact)).to.equal(true);
+    });
+
+    it('returns true when change is a relevant report for a child contact', () => {
+      const change = {
+        id: 'report1',
+        doc: {
+          _id: 'report1',
+          form: 'assessment',
+          type: DOC_TYPES.DATA_RECORD,
+          fields: { patient_id: 'child_patient1' }
+        }
+      };
+      const contact = {
+        doc: { _id: 'contact1' },
+        children: [
+          {
+            type: { id: 'person' },
+            contacts: [
+              { doc: { _id: 'child1', patient_id: 'child_patient1' } }
+            ]
+          }
+        ]
+      };
+      contactTypesIncludes.returns(false);
+      expect(service.isRelevantChange(change, contact)).to.equal(true);
+    });
+
+    it('returns false when change is unrelated', () => {
+      const change = {
+        id: 'other1',
+        doc: {
+          _id: 'other1',
+          form: 'some_form',
+          type: DOC_TYPES.DATA_RECORD,
+          fields: { patient_id: 'someone_else' }
+        }
+      };
+      const contact = {
+        doc: { _id: 'contact1', patient_id: 'patient1' },
+        children: [],
+        lineage: []
+      };
+      contactTypesIncludes.returns(false);
+      expect(service.isRelevantChange(change, contact)).to.equal(false);
+    });
+
+    it('returns false for invalid inputs', () => {
+      expect(service.isRelevantChange({}, {})).to.equal(false);
+      expect(service.isRelevantChange(undefined, undefined)).to.equal(false);
+      expect(service.isRelevantChange({ id: '1' }, { doc: { _id: '2' } })).to.equal(false);
     });
   });
 

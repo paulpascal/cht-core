@@ -23,11 +23,11 @@ declare const medicmobile_android: any;
 const READ_ONLY_TYPES = ['form', DOC_TYPES.TRANSLATIONS];
 const READ_ONLY_IDS = [
   DOC_IDS.RESOURCES,
-  'branding',
+  DOC_IDS.BRANDING,
   DOC_IDS.SERVICE_WORKER_META,
-  'zscore-charts',
+  DOC_IDS.ZSCORE_CHARTS,
   DOC_IDS.SETTINGS,
-  'partners'
+  DOC_IDS.PARTNERS
 ];
 const DDOC_PREFIX = ['_design/'];
 const LAST_REPLICATED_SEQ_KEY = 'medic-last-replicated-seq';

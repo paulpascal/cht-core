@@ -19,15 +19,15 @@ const sidebarFilterSelectors = {
   placeAccordionBody: () => $('#place-filter-accordion mat-panel-description'),
 };
 
-const getTaskById = (emissionId) => $(`${TASK_LIST_SELECTOR} li[data-record-id="${emissionId}"`);
-const getTasks = async () => {
+const getTaskById = (emissionId) => $(`${TASK_LIST_SELECTOR} li[data-record-id="${emissionId}"]`);
+const getTasks = async (timeout = 10000) => {
   let tasks;
   await browser.waitUntil(async () => {
     const tasksList = await $(TASK_LIST_SELECTOR);
     tasks = await $$(`${TASK_LIST_SELECTOR} li.content-row`);
     return await tasksList.isDisplayed() && tasks.length > 0;
   }, {
-    timeout: 10000,
+    timeout,
     timeoutMsg: 'Expected tasks list to be displayed with at least one task'
   });
 
@@ -82,9 +82,16 @@ const waitForTaskContentLoaded = async (name) => {
   }, { timeout: 2000 });
 };
 
-const getOpenTaskElement = async () => {
-  const emissionId = (await browser.getUrl()).split('/').slice(-1)[0];
-  return getTaskById(emissionId);
+const getTaskListCount = async () => {
+  const tasks = await $$(`${TASK_LIST_SELECTOR} li.content-row`);
+  return tasks.length;
+};
+
+const waitForTaskListCountChange = async (initialCount) => {
+  await browser.waitUntil(
+    async () => (await getTaskListCount()) !== initialCount,
+    { timeout: 10000, timeoutMsg: `Task list count did not change from ${initialCount}.` }
+  );
 };
 
 const waitForTasksGroupLoaded = async () => {
@@ -107,7 +114,7 @@ const compileTasks = async (tasksFileName, sync) => {
   await chtConfUtils.initializeConfigDir();
   const tasksFilePath = path.join(__dirname, `../../../e2e/default/tasks/config/${tasksFileName}`);
   const settings = await chtConfUtils.compileConfig({ tasks: tasksFilePath });
-  await utils.updateSettings(settings, { ignoreReload: 'api', sync, refresh: sync, revert: true });
+  await utils.updateSettings(settings, { sync, refresh: sync, ignoreReload: !sync });
 };
 
 const isTaskElementDisplayed = async (type, text) => {
@@ -174,7 +181,8 @@ module.exports = {
   waitForTaskContentLoaded,
   getTaskInfo,
   getTasksListInfos,
-  getOpenTaskElement,
+  getTaskListCount,
+  waitForTaskListCountChange,
   waitForTasksGroupLoaded,
   getTasksInGroup,
   noSelectedTask,

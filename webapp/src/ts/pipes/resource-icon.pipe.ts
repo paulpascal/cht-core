@@ -34,7 +34,7 @@ export class HeaderLogoPipe implements PipeTransform {
   ) { }
 
   transform(name: string): SafeHtml {
-    return this.sanitizer.bypassSecurityTrustHtml(this.resourceIcons.getImg(name, 'branding'));
+    return this.sanitizer.bypassSecurityTrustHtml(this.resourceIcons.getImg(name, DOC_IDS.BRANDING));
   }
 }
 
@@ -51,7 +51,7 @@ export class PartnerImagePipe implements PipeTransform {
   ) { }
 
   transform(name:string) {
-    return this.sanitizer.bypassSecurityTrustHtml(this.resourceIcons.getImg(name, 'partners'));
+    return this.sanitizer.bypassSecurityTrustHtml(this.resourceIcons.getImg(name, DOC_IDS.PARTNERS));
   }
 }
 

@@ -16,7 +16,7 @@ describe('Infinite scrolling', () => {
         type: type,
       }));
     await utils.saveDocs(districtHospitals);
-    await login.cookieLogin({ createUser: false });
+    await login.cookieLogin();
   });
 
   it('should load multiple pages of contacts', async () => {
@@ -24,13 +24,12 @@ describe('Infinite scrolling', () => {
     let nbrContacts = await contactsPage.getDisplayedContactsNames();
     expect(nbrContacts.length).to.equal(PAGE_SIZE);
 
-    await commonPage.loadNextInfiniteScrollPage();
+    await commonPage.loadNextInfiniteScrollPage('people');
     nbrContacts = await contactsPage.getDisplayedContactsNames();
     expect(nbrContacts.length).to.equal(PAGE_SIZE * 2);
 
-    await commonPage.loadNextInfiniteScrollPage();
+    await commonPage.loadNextInfiniteScrollPage('people');
     nbrContacts = await contactsPage.getDisplayedContactsNames();
     expect(nbrContacts.length).to.equal(PAGE_SIZE * 3);
-    await browser.takeScreenshot();
   });
 });

@@ -34,8 +34,7 @@ describe('Send message', () => {
   };
 
   const verifyLastSmsContent = async (msg, type) => {
-    const messages = await messagesPage.getAmountOfMessagesByPhone();
-    const { content, state } = await messagesPage.getMessageContent(messages);
+    const { content, state } = await messagesPage.getLastMessageContent();
     expect(content).to.equal(smsMsg(msg, type));
     expect(state).to.equal('pending');
   };
@@ -51,6 +50,8 @@ describe('Send message', () => {
     await utils.createUsers([offlineUser]);
     await loginPage.login(offlineUser);
     await commonPage.hideSnackbar();
+    // avoid churn from server causing element rerenders, the message component is poorly written.
+    await browser.throttle('offline');
   });
 
   beforeEach(async () => {

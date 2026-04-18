@@ -21,7 +21,7 @@ angular.module('inboxFilters').filter('headerLogo',
     'use strict';
     'ngInject';
     return function(name) {
-      return $sce.trustAsHtml(ResourceIcons.getImg(name, 'branding'));
+      return $sce.trustAsHtml(ResourceIcons.getImg(name, DOC_IDS.BRANDING));
     };
   });
 
@@ -33,6 +33,6 @@ angular.module('inboxFilters').filter('partnerImage',
     'use strict';
     'ngInject';
     return name => {
-      return $sce.trustAsHtml(ResourceIcons.getImg(name, 'partners'));
+      return $sce.trustAsHtml(ResourceIcons.getImg(name, DOC_IDS.PARTNERS));
     };
   });

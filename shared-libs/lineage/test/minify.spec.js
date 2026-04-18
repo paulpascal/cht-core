@@ -1,5 +1,6 @@
 const chai = require('chai');
 const lineageFactory = require('../src');
+const { DOC_TYPES } = require('@medic/constants');
 
 describe('Minify', function() {
 
@@ -9,6 +10,16 @@ describe('Minify', function() {
   });
 
   describe('minifyLineage', function() {
+    it('returns falsy parent as-is', function() {
+      chai.expect(lineage.minifyLineage(null)).to.be.null;
+      chai.expect(lineage.minifyLineage(undefined)).to.be.undefined;
+    });
+
+    it('returns parent without _id as-is', function() {
+      const parent = { name: 'test' };
+      chai.expect(lineage.minifyLineage(parent)).to.deep.equal(parent);
+    });
+
     it('removes everything except id', function() {
       const parent = {
         _id: 'abc',
@@ -117,7 +128,7 @@ describe('Minify', function() {
       // Given
       const actual = {
         _id: 'c',
-        type: 'data_record',
+        type: DOC_TYPES.DATA_RECORD,
         patient_id: '123',
         patient: {
           _id: 'a',
@@ -131,7 +142,7 @@ describe('Minify', function() {
       };
       const expected = {
         _id: 'c',
-        type: 'data_record',
+        type: DOC_TYPES.DATA_RECORD,
         patient_id: '123'
       };
 
@@ -146,7 +157,7 @@ describe('Minify', function() {
       // Given
       const actual = {
         _id: 'c',
-        type: 'data_record',
+        type: DOC_TYPES.DATA_RECORD,
         place_id: '123',
         place: {
           _id: 'a',
@@ -160,7 +171,7 @@ describe('Minify', function() {
       };
       const expected = {
         _id: 'c',
-        type: 'data_record',
+        type: DOC_TYPES.DATA_RECORD,
         place_id: '123'
       };
 
@@ -224,7 +235,7 @@ describe('Minify', function() {
     it('should not minify linked docs for reports', () => {
       const actual = {
         _id: 'r',
-        type: 'data_record',
+        type: DOC_TYPES.DATA_RECORD,
         contact: {
           _id: 'contact_id',
           name: 'contact',
@@ -244,7 +255,7 @@ describe('Minify', function() {
 
       const expected = {
         _id: 'r',
-        type: 'data_record',
+        type: DOC_TYPES.DATA_RECORD,
         contact: {
           _id: 'contact_id',
           parent: { _id: 'parent_id' },
