@@ -292,7 +292,7 @@ export class TargetAggregatesService {
     const configAggregates = targetsConfig.map((targetConfig) => this.getAggregate(targetConfig, reportingMonth));
     const contacts = await this.getSupervisedContacts(facilityId);
 
-    // P2P: exclude transit contacts from target aggregation (G23)
+    // P2P: exclude transit contacts from target aggregation
     await this.p2pTransitFilterService.loadTransitIndex();
     const filteredContacts = this.p2pTransitFilterService.filterTransitDocs(contacts);
 

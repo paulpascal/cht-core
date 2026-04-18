@@ -18,7 +18,7 @@ const DEFAULT_SHARED_DOC_TYPES = [
  * @param {Object} userSettings - User settings doc from CouchDB
  * @param {string} userSettings.facility_id - User's facility UUID
  * @param {string[]} userSettings.roles - User's roles
- * @returns {Object} ScopeManifest per CONTRACT.md Section 3
+ * @returns {Object} ScopeManifest
  */
 const getMaxReplicationDepth = (userRoles) => {
   const depthSettings = config.get('replication_depth') || [];

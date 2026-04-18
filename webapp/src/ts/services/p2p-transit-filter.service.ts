@@ -7,8 +7,8 @@ const TRANSIT_DOC_ID = '_local/p2p-transit-docs';
 /**
  * Loads _local/p2p-transit-docs from PouchDB and provides transit doc filtering.
  *
- * G23: Transit docs NEVER appear in UI (contacts, search, tasks, reports, targets).
- * G24: Transit index load < 50ms.
+ * Transit docs NEVER appear in UI (contacts, search, tasks, reports, targets).
+ * Transit index load < 50ms.
  */
 @Injectable({ providedIn: 'root' })
 export class P2pTransitFilterService {
@@ -85,7 +85,7 @@ export class P2pTransitFilterService {
 
   /**
    * Check if a doc ID is a transit doc (should be hidden from UI).
-   * G23: transit docs must never appear in contacts, search, tasks, reports, targets.
+   * transit docs must never appear in contacts, search, tasks, reports, targets.
    */
   isTransitDoc(docId: string): boolean {
     return this.transitDocIds.has(docId);

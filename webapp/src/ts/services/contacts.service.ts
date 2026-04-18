@@ -62,7 +62,7 @@ export class ContactsService {
         .all(relevantCaches)
         .then(results => _flattenDeep(results))
         .then(async (contacts) => {
-          // P2P: filter out transit contacts from cache results (G23)
+          // P2P: filter out transit contacts from cache results
           await this.p2pTransitFilterService.loadTransitIndex();
           return this.p2pTransitFilterService.filterTransitDocs(contacts);
         });

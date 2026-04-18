@@ -2,6 +2,8 @@ const auth = require('../auth');
 const logger = require('@medic/logger');
 const serverUtils = require('../server-utils');
 
+const UNKNOWN = 'unknown';
+
 /**
  * POST /api/v1/p2p/telemetry
  * Receives P2P telemetry from devices. Fire-and-forget (202 Accepted).
@@ -27,11 +29,11 @@ const recordTelemetry = async (req, res) => {
     for (const session of sessions) {
       logger.info(
         'P2P session %s: role=%s, docs=%d, bytes=%d, status=%s',
-        session.session_id || 'unknown',
-        session.role || 'unknown',
+        session.session_id || UNKNOWN,
+        session.role || UNKNOWN,
         session.docs_transferred || 0,
         session.bytes_transferred || 0,
-        session.status || 'unknown'
+        session.status || UNKNOWN
       );
     }
 

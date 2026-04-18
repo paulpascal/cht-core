@@ -28,6 +28,22 @@ type SyncState =
   'stopping' | 'scanning' | 'waiting' | 'connecting' |
   'waiting_wifi' | 'stopped' | 'preview' | 'peer_connected';
 
+const S: Record<string, SyncState> = {
+  IDLE: 'idle',
+  STARTING: 'starting',
+  SYNCING: 'syncing',
+  COMPLETED: 'completed',
+  FAILED: 'failed',
+  STOPPING: 'stopping',
+  SCANNING: 'scanning',
+  WAITING: 'waiting',
+  CONNECTING: 'connecting',
+  WAITING_WIFI: 'waiting_wifi',
+  STOPPED: 'stopped',
+  PREVIEW: 'preview',
+  PEER_CONNECTED: 'peer_connected',
+};
+
 const SYNC_LOG_ID = '_local/p2p-sync-log';
 const RELAY_LOG_ID = '_local/p2p-relay-log';
 const ERROR_NOT_INITIALIZED = 'p2p.error.not_initialized';
@@ -46,6 +62,12 @@ interface SyncSession {
 }
 
 type SessionStatus = 'completed' | 'failed' | 'interrupted';
+
+const SESSION_STATUS: Record<string, SessionStatus> = {
+  COMPLETED: 'completed',
+  FAILED: 'failed',
+  INTERRUPTED: 'interrupted',
+};
 
 interface RelaySession {
   session_id: string;
@@ -107,7 +129,7 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
   hasBridgeAvailable = false;
 
   // Sync state
-  syncState: SyncState = 'idle';
+  syncState: SyncState = S.IDLE;
   hotspotActive = false;
   connectedPeers: string[] = [];
   qrCodeDataUrl: string | null = null;
@@ -349,16 +371,16 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
         medicmobile_android.getP2pPermissions();
       }
       this.lastError = 'p2p.error.permission_needed';
-      this.syncState = 'idle';
+      this.syncState = S.IDLE;
       return false;
     }
     if (cap.capability === 'location_services_off') {
       this.lastError = cap.reason;
-      this.syncState = 'idle';
+      this.syncState = S.IDLE;
       return false;
     }
     this.lastError = cap.reason || cap.capability;
-    this.syncState = 'failed';
+    this.syncState = S.FAILED;
     return false;
   }
 
@@ -400,12 +422,12 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
 
   private handleHostModeResult(result: any) {
     if (result.ok) {
-      this.syncState = 'waiting';
+      this.syncState = S.WAITING;
       this.hotspotActive = true;
       this.extractQrCredentials(result);
       this.startStatusPolling();
     } else {
-      this.syncState = 'failed';
+      this.syncState = S.FAILED;
       this.lastError = result.error || 'Unknown error';
     }
   }
@@ -418,7 +440,7 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
       this.lastError = ERROR_NOT_INITIALIZED;
       return;
     }
-    this.syncState = 'starting';
+    this.syncState = S.STARTING;
     this.lastError = null;
     await new Promise(resolve => setTimeout(resolve, 0));
     if (!this.checkAndRequestPermissions()) {
@@ -428,7 +450,7 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
       const raw = medicmobile_android.p2pStartHostMode();
       this.handleHostModeResult(JSON.parse(raw));
     } catch (err: any) {
-      this.syncState = 'failed';
+      this.syncState = S.FAILED;
       this.lastError = err.message || 'Failed to start host mode';
       console.error('P2pStatus: failed to start host mode', err);
     }
@@ -442,7 +464,7 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
       this.lastError = ERROR_NOT_INITIALIZED;
       return;
     }
-    this.syncState = 'scanning';
+    this.syncState = S.SCANNING;
     this.lastError = null;
     if (!this.checkAndRequestPermissions()) {
       return;
@@ -452,47 +474,45 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
     (window as any).CHTCore = (window as any).CHTCore || {};
     (window as any).CHTCore.P2p = (window as any).CHTCore.P2p || {};
     (window as any).CHTCore.P2p.onQrScanResult = (qrData: string | null) => {
-      this.ngZone.run(() => {
-        if (!qrData) {
-          this.syncState = 'idle';
-          return;
-        }
-        try {
-          const raw = medicmobile_android.p2pStartClientMode(qrData);
-          const result = JSON.parse(raw);
-          if (result.ok) {
-            this.hotspotSsid = result.ssid || null;
-            this.hotspotPassword = result.password || null;
-
-            if (result.auto_connecting) {
-              // WiFi auto-connect in progress — show "Connecting to WiFi..."
-              // and poll status to track state transitions
-              this.syncState = 'connecting';
-              this.startStatusPolling();
-            } else {
-              // No auto-connect (API < 29) — show credentials for manual connect
-              this.syncState = 'waiting_wifi';
-              this.startConnectionPolling();
-            }
-          } else {
-            this.syncState = 'failed';
-            this.lastError = result.error || 'Unknown error';
-          }
-        } catch (err: any) {
-          this.syncState = 'failed';
-          this.lastError = err.message || 'Failed to connect';
-          console.error('P2pStatus: failed to start peer mode', err);
-        }
-      });
+      this.ngZone.run(() => this.handleQrScanResult(qrData));
     };
 
     // Launch QR scanner
     try {
       medicmobile_android.p2pScanQrCode();
     } catch (err: any) {
-      this.syncState = 'failed';
+      this.syncState = S.FAILED;
       this.lastError = err.message || 'Failed to launch QR scanner';
       console.error('P2pStatus: failed to launch QR scanner', err);
+    }
+  }
+
+  private handleQrScanResult(qrData: string | null) {
+    if (!qrData) {
+      this.syncState = S.IDLE;
+      return;
+    }
+    try {
+      const raw = medicmobile_android.p2pStartClientMode(qrData);
+      const result = JSON.parse(raw);
+      if (!result.ok) {
+        this.syncState = S.FAILED;
+        this.lastError = result.error || 'Unknown error';
+        return;
+      }
+      this.hotspotSsid = result.ssid || null;
+      this.hotspotPassword = result.password || null;
+      if (result.auto_connecting) {
+        this.syncState = S.CONNECTING;
+        this.startStatusPolling();
+      } else {
+        this.syncState = S.WAITING_WIFI;
+        this.startConnectionPolling();
+      }
+    } catch (err: any) {
+      this.syncState = S.FAILED;
+      this.lastError = err.message || 'Failed to connect';
+      console.error('P2pStatus: failed to start peer mode', err);
     }
   }
 
@@ -505,17 +525,17 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
       const raw = (window as any).medicmobile_android.p2pRetrySync();
       const result = JSON.parse(raw);
       if (result.ok) {
-        this.syncState = 'connecting';
+        this.syncState = S.CONNECTING;
         this.startStatusPolling();
       } else if (result.error?.includes('no_cached_connection')) {
         // No cached credentials — fall back to full re-scan
         this.startAsPeer();
       } else {
-        this.syncState = 'failed';
+        this.syncState = S.FAILED;
         this.lastError = result.error || 'Retry failed';
       }
     } catch (err: any) {
-      this.syncState = 'failed';
+      this.syncState = S.FAILED;
       this.lastError = err.message || 'Retry failed';
       console.error('P2pStatus: retry failed', err);
     }
@@ -525,7 +545,7 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
     if (!this.hasBridgeAvailable) {
       return;
     }
-    this.syncState = 'stopping';
+    this.syncState = S.STOPPING;
     try {
       medicmobile_android.p2pStop();
     } catch (err: any) {
@@ -533,15 +553,15 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
     }
     this.stopStatusPolling();
     this.stopConnectionPolling();
-    this.syncState = 'stopped';
+    this.syncState = S.STOPPED;
     this.hotspotActive = false;
     this.connectedPeers = [];
     this.qrCodeDataUrl = null;
     this.hotspotSsid = null;
     this.hotspotPassword = null;
     this.stoppedResetTimeout = setTimeout(() => {
-      if (this.syncState === 'stopped') {
-        this.syncState = 'idle';
+      if (this.syncState === S.STOPPED) {
+        this.syncState = S.IDLE;
       }
     }, 3000);
 
@@ -561,14 +581,14 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
       const raw = medicmobile_android.p2pProceedSync();
       const result = JSON.parse(raw);
       if (result.ok) {
-        this.syncState = 'syncing';
+        this.syncState = S.SYNCING;
         this.startStatusPolling();
       } else {
-        this.syncState = 'failed';
+        this.syncState = S.FAILED;
         this.lastError = result.error || 'Failed to proceed';
       }
     } catch (err: any) {
-      this.syncState = 'failed';
+      this.syncState = S.FAILED;
       this.lastError = err.message || 'Failed to proceed with sync';
       console.error('P2pStatus: failed to proceed with sync', err);
     }
@@ -587,39 +607,42 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
       clearTimeout(this.completionResetTimeout);
     }
     this.completionResetTimeout = setTimeout(() => {
-      if (this.syncState === 'completed') {
+      if (this.syncState === S.COMPLETED) {
         this.resetToIdle();
       }
     }, 10000);
   }
 
   private triggerPostP2pSync(attempt = 1, maxAttempts = 4, delayMs = 3000) {
-    setTimeout(async () => {
-      try {
-        console.info(`P2pStatus: post-P2P server sync attempt ${attempt}/${maxAttempts}`);
-        await this.dbSyncService.sync(true);
-        const failures = this.dbSyncService.getLastToWriteFailures();
-        if (failures > 0) {
-          console.warn(`P2pStatus: ${failures} write failures, skipping purge`);
-          if (attempt < maxAttempts) {
-            this.triggerPostP2pSync(attempt + 1, maxAttempts, delayMs);
-          }
-          return;
-        }
-        console.info('P2pStatus: 0 write failures, purging P2P docs');
-        await this.transitPurgeService.markAllBatchesPushedAndPurge();
-        await this.loadTransitStats();
-      } catch (err) {
-        console.warn(`P2pStatus: post-P2P sync attempt ${attempt} failed`, err);
-        if (attempt < maxAttempts) {
-          this.triggerPostP2pSync(attempt + 1, maxAttempts, delayMs);
-        }
+    setTimeout(() => this.executePostP2pSyncAttempt(attempt, maxAttempts, delayMs), delayMs);
+  }
+
+  private async executePostP2pSyncAttempt(attempt: number, maxAttempts: number, delayMs: number) {
+    try {
+      console.info(`P2pStatus: post-P2P sync attempt ${attempt}/${maxAttempts}`);
+      await this.dbSyncService.sync(true);
+      const failures = this.dbSyncService.getLastToWriteFailures();
+      if (failures > 0) {
+        this.retryPostP2pSyncIfPossible(attempt, maxAttempts, delayMs, `${failures} write failures`);
+        return;
       }
-    }, delayMs);
+      console.info('P2pStatus: 0 write failures, purging P2P docs');
+      await this.transitPurgeService.markAllBatchesPushedAndPurge();
+      await this.loadTransitStats();
+    } catch (err) {
+      this.retryPostP2pSyncIfPossible(attempt, maxAttempts, delayMs, String(err));
+    }
+  }
+
+  private retryPostP2pSyncIfPossible(attempt: number, maxAttempts: number, delayMs: number, reason: string) {
+    console.warn(`P2pStatus: attempt ${attempt} issue: ${reason}`);
+    if (attempt < maxAttempts) {
+      this.triggerPostP2pSync(attempt + 1, maxAttempts, delayMs);
+    }
   }
 
   private resetToIdle() {
-    this.syncState = 'idle';
+    this.syncState = S.IDLE;
     this.docsSynced = 0;
     this.totalDocs = 0;
     this.bytesTransferred = 0;
@@ -684,7 +707,7 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
           if (result.connected) {
             console.info('P2pStatus: host reachable, starting sync');
             this.stopConnectionPolling();
-            this.syncState = 'connecting';
+            this.syncState = S.CONNECTING;
             this.startStatusPolling();
           }
         } catch (err) {
@@ -716,17 +739,17 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
   }
 
   private handlePollStateTransitions(rawState: string, status: any) {
-    if (rawState === 'preview') {
+    if (rawState === S.PREVIEW) {
       this.previewContacts = status.preview_contacts || 0;
       this.previewReports = status.preview_reports || 0;
       this.previewTotal = status.preview_total || 0;
       this.stopStatusPolling();
       return;
     }
-    if (this.syncState === 'syncing') {
+    if (this.syncState === S.SYNCING) {
       this.transitDocCount = this.transitFilterService.getTransitDocCount();
     }
-    if (this.syncState === 'completed' || this.syncState === 'failed' || this.syncState === 'idle') {
+    if (this.syncState === S.COMPLETED || this.syncState === S.FAILED || this.syncState === S.IDLE) {
       this.stopStatusPolling();
       this.loadTransitStats();
       this.loadHistory();
@@ -741,10 +764,10 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
       try {
         const raw = medicmobile_android.p2pGetStatus();
         const status = JSON.parse(raw);
-        const rawState = status.state || 'idle';
+        const rawState = status.state || S.IDLE;
 
-        if (rawState === 'waiting_wifi' && this.syncState !== 'waiting_wifi') {
-          this.syncState = 'waiting_wifi';
+        if (rawState === S.WAITING_WIFI && this.syncState !== S.WAITING_WIFI) {
+          this.syncState = S.WAITING_WIFI;
           this.stopStatusPolling();
           this.startConnectionPolling();
           return;
@@ -774,7 +797,7 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
     if (status.hotspot_password) {
       this.hotspotPassword = status.hotspot_password;
     }
-    if (state === 'preview') {
+    if (state === S.PREVIEW) {
       this.previewContacts = status.preview_contacts || 0;
       this.previewReports = status.preview_reports || 0;
       this.previewTotal = status.preview_total || 0;
@@ -782,8 +805,8 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
   }
 
   private resumePollingForState(state: string) {
-    const statusPollStates = ['waiting', 'syncing', 'connecting', 'scanning'];
-    if (state === 'waiting_wifi') {
+    const statusPollStates: string[] = [S.WAITING, S.SYNCING, S.CONNECTING, S.SCANNING];
+    if (state === S.WAITING_WIFI) {
       this.startConnectionPolling();
     } else if (statusPollStates.includes(state)) {
       this.startStatusPolling();
@@ -797,8 +820,8 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
     try {
       const raw = medicmobile_android.p2pGetStatus();
       const status = JSON.parse(raw);
-      const state = status.state || 'idle';
-      if (state === 'idle') {
+      const state = status.state || S.IDLE;
+      if (state === S.IDLE) {
         return;
       }
       this.syncState = state as SyncState;
@@ -820,14 +843,14 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
 
   get isSyncing(): boolean {
     const activeStates: SyncState[] = [
-      'syncing', 'starting', 'waiting', 'scanning',
-      'connecting', 'waiting_wifi', 'preview', 'peer_connected',
+      S.SYNCING, S.STARTING, S.WAITING, S.SCANNING,
+      S.CONNECTING, S.WAITING_WIFI, S.PREVIEW, S.PEER_CONNECTED,
     ];
     return activeStates.includes(this.syncState);
   }
 
   get canStart(): boolean {
-    return this.p2pEnabled && this.syncState === 'idle' && this.hasBridgeAvailable;
+    return this.p2pEnabled && this.syncState === S.IDLE && this.hasBridgeAvailable;
   }
 
   // --- History ---
@@ -923,18 +946,18 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
 
   getStatusIcon(status: string): string {
     switch (status) {
-      case 'completed': return 'check_circle';
-      case 'failed': return 'error';
-      case 'interrupted': return 'warning';
+      case SESSION_STATUS.COMPLETED: return 'check_circle';
+      case SESSION_STATUS.FAILED: return 'error';
+      case SESSION_STATUS.INTERRUPTED: return 'warning';
       default: return 'help';
     }
   }
 
   getStatusClass(status: string): string {
     switch (status) {
-      case 'completed': return 'p2p-success';
-      case 'failed': return 'p2p-error';
-      case 'interrupted': return 'p2p-warning-icon';
+      case SESSION_STATUS.COMPLETED: return 'p2p-success';
+      case SESSION_STATUS.FAILED: return 'p2p-error';
+      case SESSION_STATUS.INTERRUPTED: return 'p2p-warning-icon';
       default: return '';
     }
   }

@@ -10,11 +10,11 @@ const jsonParser = bodyParser.json({ limit: '1mb' });
 
 /**
  * Register all P2P API routes.
- * Called from the main routing.js during Wave 4 assembly.
- * P2P routes must be accessible by offline users (CHWs/Supervisors),
+ * Called from the main routing.js.
+ * P2P routes must be accessible by offline users,
  * so we set the authorized flag to bypass the offline user firewall.
  *
- * @param {import('express').Router} app - Express router
+ * @param {Object} app - Express router
  */
 const registerP2pRoutes = (app) => {
   app.all('/api/v1/p2p/*path', authorization.setAuthorized);

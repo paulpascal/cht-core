@@ -118,6 +118,12 @@ describe('SidebarMenuComponent', () => {
 
     expect(component.secondaryOptions).excluding('click').have.deep.members([
       {
+        routerLink: 'p2p',
+        icon: 'fa-wifi',
+        translationKey: 'p2p.menu.title',
+        canDisplay: false,
+      },
+      {
         routerLink: 'trainings',
         icon: 'fa-graduation-cap',
         translationKey: 'training_materials.page.title',

@@ -253,8 +253,8 @@ export class DBSyncService {
       window.localStorage.setItem(LAST_REPLICATED_DATE_KEY, Date.now() + '');
       this.syncIsRecent = syncState.from === SyncStatus.Success;
 
-      // Auto-purge P2P transit docs after successful sync with 0 write failures (Gap 2 fix).
-      // When supervisor comes online hours after P2P, normal sync pushes docs to server.
+      // Auto-purge P2P transit docs after successful sync with 0 write failures.
+      // When host comes online hours after P2P, normal sync pushes docs to server.
       // This triggers purge of transit docs that are no longer needed locally.
       if (this.lastToWriteFailures === 0) {
         this.purgeP2pTransitDocsIfNeeded();
@@ -430,18 +430,23 @@ export class DBSyncService {
   }
 
   private async shouldSkipSync(force: boolean): Promise<boolean> {
-    if (!force && this.isP2pActive()) {
-      try {
-        const shouldPause = await this.p2pConfigService.shouldPauseReplicationDuringSync();
-        if (shouldPause) {
-          console.log('db-sync: skipping sync cycle — P2P active and pause_replication_during_sync enabled');
-          return true;
-        }
-      } catch (err) {
-        console.debug('db-sync: P2P config check failed', err);
-      }
+    if (force || !this.isP2pActive()) {
+      return false;
     }
-    return false;
+    return this.isP2pPausingSync();
+  }
+
+  private async isP2pPausingSync(): Promise<boolean> {
+    try {
+      const shouldPause = await this.p2pConfigService.shouldPauseReplicationDuringSync();
+      if (shouldPause) {
+        console.log('db-sync: skipping sync — P2P active and pause enabled');
+      }
+      return shouldPause;
+    } catch (err) {
+      console.debug('db-sync: P2P config check failed', err);
+      return false;
+    }
   }
 
   async sync(force?, quick?) {

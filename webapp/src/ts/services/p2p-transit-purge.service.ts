@@ -39,7 +39,7 @@ interface TransitDoc {
 /**
  * Purges transit docs after they've been successfully pushed to the server.
  *
- * G25: MUST use db.purge(id, rev) -- NEVER db.remove().
+ * MUST use db.purge(id, rev) -- NEVER db.remove().
  *      db.remove() creates a deletion tombstone that replicates to server and destroys data.
  *      db.purge() removes locally without any replication effect.
  */
@@ -55,7 +55,7 @@ export class P2pTransitPurgeService {
    * Purge all transit docs from batches that have been pushed to the server.
    * Called after successful server sync confirms docs are on server.
    *
-   * G25: Uses db.purge() NOT db.remove().
+   * Uses db.purge() NOT db.remove().
    */
   private async getTransitDoc(): Promise<TransitDoc | null> {
     try {
@@ -85,20 +85,26 @@ export class P2pTransitPurgeService {
     docIds: string[], result: PurgeResult, failedDocIds: Set<string>
   ): Promise<void> {
     for (const docId of docIds) {
-      try {
-        const success = await this.purgeDoc(docId);
-        if (success) {
-          result.purged++;
-        } else {
-          result.alreadyPurged++;
-        }
-      } catch (err) {
-        console.error('P2pTransitPurge: failed to purge doc', docId, err);
-        failedDocIds.add(docId);
-        result.failed++;
-      }
+      await this.purgeOneDoc(docId, result, failedDocIds);
     }
     this.notifyBridgeBatchPurged(docIds);
+  }
+
+  private async purgeOneDoc(
+    docId: string, result: PurgeResult, failedDocIds: Set<string>
+  ): Promise<void> {
+    try {
+      const success = await this.purgeDoc(docId);
+      if (success) {
+        result.purged++;
+      } else {
+        result.alreadyPurged++;
+      }
+    } catch (err) {
+      console.error('P2pTransitPurge: failed to purge doc', docId, err);
+      failedDocIds.add(docId);
+      result.failed++;
+    }
   }
 
   private notifyBridgeBatchPurged(docIds: string[]) {
@@ -113,16 +119,17 @@ export class P2pTransitPurgeService {
   }
 
   async purgeConfirmedTransitDocs(): Promise<PurgeResult> {
-    const result: PurgeResult = { purged: 0, failed: 0, alreadyPurged: 0 };
     const transitDoc = await this.getTransitDoc();
     if (!transitDoc) {
-      return result;
+      return { purged: 0, failed: 0, alreadyPurged: 0 };
     }
 
     const purgeableBatchIds = this.getPurgeableBatchIds(transitDoc);
     if (purgeableBatchIds.length === 0) {
-      return result;
+      return { purged: 0, failed: 0, alreadyPurged: 0 };
     }
+
+    const result: PurgeResult = { purged: 0, failed: 0, alreadyPurged: 0 };
 
     const docIdsToPurge = this.getDocIdsForBatches(transitDoc, purgeableBatchIds);
     const failedDocIds = new Set<string>();
@@ -145,7 +152,7 @@ export class P2pTransitPurgeService {
    * Purge a single doc by ID using CHT's soft-delete pattern:
    * {_id, _rev, _deleted: true, purged: true}
    *
-   * G25: The readOnlyFilter in db-sync.service.ts already excludes docs with
+   * The readOnlyFilter in db-sync.service.ts already excludes docs with
    * {_deleted: true, purged: true} from replicating to server, so this is safe.
    * This is the same pattern used by CHT's bootstrapper/purger.js.
    */
@@ -283,7 +290,7 @@ export class P2pTransitPurgeService {
 
   /**
    * Check if there are stale transit docs (unpushed for >30 days).
-   * G27: Show user notification for stale transit docs.
+   * Show user notification for stale transit docs.
    */
   private hasStaleBatch(transitDoc: TransitDoc, cutoff: number): boolean {
     return Object.values(transitDoc.batches).some(

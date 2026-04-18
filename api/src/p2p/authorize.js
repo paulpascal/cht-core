@@ -16,10 +16,12 @@ let cachedKeyPair = null;
  * Base64url encode a buffer (JWT-safe encoding).
  */
 const base64url = (buf) => {
-  return buf.toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
+  let str = buf.toString('base64');
+  str = str.replace(/\+/g, '-').replace(/\//g, '_');
+  while (str.endsWith('=')) {
+    str = str.slice(0, -1);
+  }
+  return str;
 };
 
 /**
@@ -134,7 +136,7 @@ const signJwt = async (payload) => {
 };
 
 /**
- * Build JWT payload per CONTRACT.md Section 2.
+ * Build JWT payload.
  */
 const buildPayload = (userSettings, facilityPath) => {
   const p2pConfig = config.get('p2p_sync') || {};

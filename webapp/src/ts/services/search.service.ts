@@ -174,9 +174,11 @@ export class SearchService {
         .filter(docId => searchResults.docIds.indexOf(docId) === -1)
         .forEach(docId => searchResults.docIds.push(docId));
 
-      // P2P: filter out transit docs from search results (G23)
-      await this.p2pTransitFilterService.loadTransitIndex();
-      searchResults.docIds = searchResults.docIds.filter(id => !this.p2pTransitFilterService.isTransitDoc(id));
+      // P2P: filter out transit docs from search results
+      if (searchResults?.docIds?.length) {
+        await this.p2pTransitFilterService.loadTransitIndex();
+        searchResults.docIds = searchResults.docIds.filter(id => !this.p2pTransitFilterService.isTransitDoc(id));
+      }
 
       const dataRecordsPromise = this.getDataRecordsService.get(
         searchResults.docIds,

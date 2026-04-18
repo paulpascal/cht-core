@@ -453,7 +453,10 @@ export class RulesEngineService implements OnDestroy {
     }
     trackPerformanceRunning.stop({ name: trackName });
 
-    // P2P: exclude tasks owned by transit docs (G23)
+    // P2P: exclude tasks owned by transit docs
+    if (!taskDocs?.length) {
+      return this.hydrateTaskDocs(taskDocs || []);
+    }
     await this.p2pTransitFilterService.loadTransitIndex();
     const filteredTaskDocs = taskDocs.filter(
       (task: TaskDoc) => !this.p2pTransitFilterService.isTransitDoc(task.owner) &&
@@ -491,11 +494,11 @@ export class RulesEngineService implements OnDestroy {
     }
     trackPerformanceRunning?.stop({ name: trackName });
 
-    // P2P: exclude tasks owned by transit docs (G23)
-    const filteredTaskDocs = taskDocs.filter(
+    // P2P: exclude tasks owned by transit docs
+    const filteredTaskDocs = taskDocs?.filter(
       (task: TaskDoc) => !this.p2pTransitFilterService.isTransitDoc(task.owner) &&
                          !this.p2pTransitFilterService.isTransitDoc(task._id)
-    );
+    ) || [];
 
     return this.hydrateTaskDocs(filteredTaskDocs);
   }
