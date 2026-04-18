@@ -417,7 +417,7 @@ export class DBSyncService {
   */
   private isP2pActive(): boolean {
     try {
-      if (typeof medicmobile_android === 'undefined' ||
+      if (medicmobile_android === undefined ||
           typeof medicmobile_android.p2pIsActive !== 'function') {
         return false;
       }
@@ -429,23 +429,29 @@ export class DBSyncService {
     }
   }
 
-  async sync(force?, quick?) {
-    if (!this.isEnabled()) {
-      this.sendUpdate({ state: SyncStatus.Disabled });
-      return Promise.resolve();
-    }
-
-    // Skip sync cycle when P2P is active and config flag is enabled
+  private async shouldSkipSync(force: boolean): Promise<boolean> {
     if (!force && this.isP2pActive()) {
       try {
         const shouldPause = await this.p2pConfigService.shouldPauseReplicationDuringSync();
         if (shouldPause) {
           console.log('db-sync: skipping sync cycle — P2P active and pause_replication_during_sync enabled');
-          return Promise.resolve();
+          return true;
         }
       } catch (err) {
         console.debug('db-sync: P2P config check failed', err);
       }
+    }
+    return false;
+  }
+
+  async sync(force?, quick?) {
+    if (!this.isEnabled()) {
+      this.sendUpdate({ state: SyncStatus.Disabled });
+      return;
+    }
+
+    if (await this.shouldSkipSync(force)) {
+      return;
     }
 
     await this.migrateDb();

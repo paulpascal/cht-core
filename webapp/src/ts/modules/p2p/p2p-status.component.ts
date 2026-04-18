@@ -192,73 +192,73 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
     this.p2pRole = await this.p2pConfigService.getUserP2pRole();
   }
 
+  private async fetchRevocationList(): Promise<any> {
+    try {
+      return await firstValueFrom(this.http.get<any>('/api/v1/p2p/revocation-list'));
+    } catch (err) {
+      console.debug('P2pStatus: could not fetch revocation list, using empty', err);
+      return { version: 0, revoked_devices: [], revoked_users: [] };
+    }
+  }
+
+  private async buildInitConfig(authResponse: any): Promise<any> {
+    const revocationList = await this.fetchRevocationList();
+    const deviceId = await this.getOrCreateDeviceId();
+    const userCtx = this.sessionService.userCtx();
+    return {
+      config: await firstValueFrom(this.http.get<any>('/api/v1/p2p/config/_')),
+      scope_manifest: authResponse.scope_manifest,
+      server_public_key: authResponse.server_public_key,
+      token: authResponse.token,
+      revocation_list: revocationList,
+      device_id: deviceId,
+      user_id: userCtx?.name || 'unknown',
+    };
+  }
+
+  private callBridgeInitialize(config: any): boolean {
+    const raw = medicmobile_android.p2pInitialize(JSON.stringify(config));
+    const result = JSON.parse(raw);
+    return result.ok;
+  }
+
+  private async initializeFromCache(): Promise<void> {
+    const cached = await this.loadCachedInitConfig();
+    if (!cached) {
+      console.error('P2pStatus: no cached config available, P2P unavailable offline');
+      return;
+    }
+    try {
+      if (this.callBridgeInitialize(cached)) {
+        this.bridgeInitialized = true;
+        console.info('P2pStatus: bridge initialized from cache');
+      }
+    } catch (cacheErr) {
+      console.error('P2pStatus: cached config init failed', cacheErr);
+    }
+  }
+
   private async initializeBridge() {
     if (this.bridgeInitialized) {
       return;
     }
+    if (typeof medicmobile_android.p2pInitialize !== 'function') {
+      console.debug('P2pStatus: p2pInitialize not available on bridge');
+      return;
+    }
     try {
-      if (typeof medicmobile_android.p2pInitialize !== 'function') {
-        console.debug('P2pStatus: p2pInitialize not available on bridge');
-        return;
-      }
-
-      // Fetch authorization bundle from server (includes JWT, public key, scope manifest)
-      const authResponse: any = await firstValueFrom(
-        this.http.post('/api/v1/p2p/authorize', {})
-      );
-
-      // Fetch revocation list
-      let revocationList = { version: 0, revoked_devices: [], revoked_users: [] };
-      try {
-        revocationList = await firstValueFrom(
-          this.http.get<any>('/api/v1/p2p/revocation-list')
-        );
-      } catch (err) {
-        console.debug('P2pStatus: could not fetch revocation list, using empty', err);
-      }
-
-      // Get device ID from local doc or generate one
-      const deviceId = await this.getOrCreateDeviceId();
-      const userCtx = this.sessionService.userCtx();
-
-      const initConfig = {
-        config: await firstValueFrom(
-          this.http.get<any>('/api/v1/p2p/config/_')
-        ),
-        scope_manifest: authResponse.scope_manifest,
-        server_public_key: authResponse.server_public_key,
-        token: authResponse.token,
-        revocation_list: revocationList,
-        device_id: deviceId,
-        user_id: userCtx?.name || 'unknown',
-      };
-
-      const raw = medicmobile_android.p2pInitialize(JSON.stringify(initConfig));
-      const result = JSON.parse(raw);
-      if (result.ok) {
+      const authResponse: any = await firstValueFrom(this.http.post('/api/v1/p2p/authorize', {}));
+      const initConfig = await this.buildInitConfig(authResponse);
+      if (this.callBridgeInitialize(initConfig)) {
         this.bridgeInitialized = true;
         console.info('P2pStatus: bridge initialized successfully');
         await this.cacheInitConfig(initConfig);
       } else {
-        console.error('P2pStatus: bridge init failed', result.error);
+        console.error('P2pStatus: bridge init failed');
       }
     } catch (err) {
       console.warn('P2pStatus: server unreachable, trying cached config', err);
-      const cached = await this.loadCachedInitConfig();
-      if (cached) {
-        try {
-          const raw = medicmobile_android.p2pInitialize(JSON.stringify(cached));
-          const result = JSON.parse(raw);
-          if (result.ok) {
-            this.bridgeInitialized = true;
-            console.info('P2pStatus: bridge initialized from cache');
-            return;
-          }
-        } catch (cacheErr) {
-          console.error('P2pStatus: cached config init failed', cacheErr);
-        }
-      }
-      console.error('P2pStatus: no cached config available, P2P unavailable offline');
+      await this.initializeFromCache();
     }
   }
 
@@ -290,7 +290,7 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
     }
   }
 
-  private async loadCachedInitConfig(): Promise<any | null> {
+  private async loadCachedInitConfig(): Promise<any> {
     const db = this.dbService.get();
     try {
       const doc: any = await db.get('_local/p2p-init-cache');
@@ -382,6 +382,34 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
     }
   }
 
+  private extractQrCredentials(result: any) {
+    if (result.qr_data_url) {
+      this.qrCodeDataUrl = result.qr_data_url;
+    }
+    if (!result.qr_payload) {
+      return;
+    }
+    try {
+      const qr = JSON.parse(result.qr_payload);
+      this.hotspotSsid = qr.ssid || null;
+      this.hotspotPassword = qr.pwd || null;
+    } catch (err) {
+      console.debug('P2pStatus: QR payload parse failed', err);
+    }
+  }
+
+  private handleHostModeResult(result: any) {
+    if (result.ok) {
+      this.syncState = 'waiting';
+      this.hotspotActive = true;
+      this.extractQrCredentials(result);
+      this.startStatusPolling();
+    } else {
+      this.syncState = 'failed';
+      this.lastError = result.error || 'Unknown error';
+    }
+  }
+
   async startAsHost() {
     if (!this.hasBridgeAvailable) {
       return;
@@ -392,34 +420,13 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
     }
     this.syncState = 'starting';
     this.lastError = null;
-    await new Promise(resolve => setTimeout(resolve, 0)); // yield to let Angular render "Starting..." state
+    await new Promise(resolve => setTimeout(resolve, 0));
     if (!this.checkAndRequestPermissions()) {
       return;
     }
     try {
       const raw = medicmobile_android.p2pStartHostMode();
-      const result = JSON.parse(raw);
-      if (result.ok) {
-        this.syncState = 'waiting';
-        this.hotspotActive = true;
-        if (result.qr_data_url) {
-          this.qrCodeDataUrl = result.qr_data_url;
-        }
-        // Extract WiFi credentials from QR payload
-        if (result.qr_payload) {
-          try {
-            const qr = JSON.parse(result.qr_payload);
-            this.hotspotSsid = qr.ssid || null;
-            this.hotspotPassword = qr.pwd || null;
-          } catch (err) {
-            console.debug('P2pStatus: QR payload parse failed', err);
-          }
-        }
-        this.startStatusPolling();
-      } else {
-        this.syncState = 'failed';
-        this.lastError = result.error || 'Unknown error';
-      }
+      this.handleHostModeResult(JSON.parse(raw));
     } catch (err: any) {
       this.syncState = 'failed';
       this.lastError = err.message || 'Failed to start host mode';
@@ -500,7 +507,7 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
       if (result.ok) {
         this.syncState = 'connecting';
         this.startStatusPolling();
-      } else if (result.error && result.error.includes('no_cached_connection')) {
+      } else if (result.error?.includes('no_cached_connection')) {
         // No cached credentials — fall back to full re-scan
         this.startAsPeer();
       } else {
@@ -680,8 +687,8 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
             this.syncState = 'connecting';
             this.startStatusPolling();
           }
-        } catch (_err) {
-          // Not connected yet, keep polling
+        } catch (err) {
+          console.debug('P2pStatus: connection check pending', err);
         }
       });
     }, 3000);
@@ -753,7 +760,7 @@ export class P2pStatusComponent implements OnInit, OnDestroy {
   }
 
   private hasBridge(): boolean {
-    return typeof medicmobile_android !== 'undefined' && medicmobile_android !== null;
+    return medicmobile_android !== undefined && medicmobile_android !== null;
   }
 
   /**

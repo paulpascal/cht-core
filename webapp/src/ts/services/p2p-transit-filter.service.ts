@@ -16,7 +16,7 @@ export class P2pTransitFilterService {
   private loaded = false;
   private loading: Promise<void> | null = null;
 
-  constructor(private dbService: DbService) {}
+  constructor(private readonly dbService: DbService) {}
 
   /**
    * Load transit doc IDs from _local/p2p-transit-docs.
@@ -39,26 +39,34 @@ export class P2pTransitFilterService {
   }
 
   private async doLoad(): Promise<void> {
-    const ids = new Set<string>();
-
-    // Try native bridge first (p2pGetTransitDocIds returns JSON array of IDs)
-    const bridge = (window as any).medicmobile_android;
-    if (bridge && typeof bridge.p2pGetTransitDocIds === 'function') {
-      try {
-        const raw = bridge.p2pGetTransitDocIds();
-        const parsed: string[] = JSON.parse(raw);
-        for (const id of parsed) {
-          ids.add(id);
-        }
-        this.transitDocIds = ids;
-        this.loaded = true;
-        return;
-      } catch (err) {
-        console.debug('P2pTransitFilter: bridge call failed, falling back to PouchDB', err);
-      }
+    const bridgeIds = this.loadFromBridge();
+    if (bridgeIds) {
+      this.transitDocIds = bridgeIds;
+      this.loaded = true;
+      return;
     }
 
-    // Fallback: read _local/p2p-transit-docs from PouchDB
+    this.transitDocIds = await this.loadFromPouchDb();
+    this.loaded = true;
+  }
+
+  private loadFromBridge(): Set<string> | null {
+    const bridge = (window as any).medicmobile_android;
+    if (!bridge || typeof bridge.p2pGetTransitDocIds !== 'function') {
+      return null;
+    }
+    try {
+      const raw = bridge.p2pGetTransitDocIds();
+      const parsed: string[] = JSON.parse(raw);
+      return new Set(parsed);
+    } catch (err) {
+      console.debug('P2pTransitFilter: bridge call failed, falling back to PouchDB', err);
+      return null;
+    }
+  }
+
+  private async loadFromPouchDb(): Promise<Set<string>> {
+    const ids = new Set<string>();
     try {
       const db = this.dbService.get();
       const doc = await db.get(TRANSIT_DOC_ID);
@@ -72,9 +80,7 @@ export class P2pTransitFilterService {
       }
       // 404 means no transit docs — expected for CHWs or fresh installs
     }
-
-    this.transitDocIds = ids;
-    this.loaded = true;
+    return ids;
   }
 
   /**

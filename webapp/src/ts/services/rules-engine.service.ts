@@ -96,8 +96,8 @@ export class RulesEngineService implements OnDestroy {
     private calendarIntervalService:CalendarIntervalService,
     private ngZone:NgZone,
     private chtDatasourceService:CHTDatasourceService,
-    private store: Store,
-    private p2pTransitFilterService: P2pTransitFilterService,
+    private readonly store: Store,
+    private readonly p2pTransitFilterService: P2pTransitFilterService,
   ) {
     this.initialized = this.initialize();
     this.rulesEngineCore = this.rulesEngineCoreFactoryService.get();

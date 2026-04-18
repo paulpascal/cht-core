@@ -47,8 +47,8 @@ interface TransitDoc {
 export class P2pTransitPurgeService {
 
   constructor(
-    private dbService: DbService,
-    private transitFilterService: P2pTransitFilterService
+    private readonly dbService: DbService,
+    private readonly transitFilterService: P2pTransitFilterService
   ) {}
 
   /**
@@ -57,80 +57,83 @@ export class P2pTransitPurgeService {
    *
    * G25: Uses db.purge() NOT db.remove().
    */
-  async purgeConfirmedTransitDocs(): Promise<PurgeResult> {
-    const result: PurgeResult = { purged: 0, failed: 0, alreadyPurged: 0 };
-
-    // Purge via PouchDB using _local/p2p-transit-docs as source of truth.
-    // The native bridge (p2pPurgeTransitDocs) only queries in-memory TransitDocManager
-    // which is cleared after p2pStop() shutdown — so it can't be relied on for
-    // the offline-then-online flow where purge happens after app restart/reconnect.
-    let transitDoc: TransitDoc;
+  private async getTransitDoc(): Promise<TransitDoc | null> {
     try {
       const db = this.dbService.get();
-      transitDoc = await db.get(TRANSIT_DOC_ID);
+      return await db.get(TRANSIT_DOC_ID);
     } catch (err: any) {
       if (err.status === 404) {
-        return result; // No transit docs to purge
+        return null;
       }
       throw err;
     }
+  }
 
-    // Find batches that have been pushed but not yet purged
-    const purgeableBatchIds: string[] = [];
-    for (const [batchId, batch] of Object.entries(transitDoc.batches)) {
-      if (batch.pushed_to_server && !batch.purged) {
-        purgeableBatchIds.push(batchId);
+  private getPurgeableBatchIds(transitDoc: TransitDoc): string[] {
+    return Object.entries(transitDoc.batches)
+      .filter(([, batch]) => batch.pushed_to_server && !batch.purged)
+      .map(([batchId]) => batchId);
+  }
+
+  private getDocIdsForBatches(transitDoc: TransitDoc, batchIds: string[]): string[] {
+    return Object.entries(transitDoc.transit_index)
+      .filter(([, batchId]) => batchIds.includes(batchId))
+      .map(([docId]) => docId);
+  }
+
+  private async purgeDocBatch(
+    docIds: string[], result: PurgeResult, failedDocIds: Set<string>
+  ): Promise<void> {
+    for (const docId of docIds) {
+      try {
+        const success = await this.purgeDoc(docId);
+        if (success) {
+          result.purged++;
+        } else {
+          result.alreadyPurged++;
+        }
+      } catch (err) {
+        console.error('P2pTransitPurge: failed to purge doc', docId, err);
+        failedDocIds.add(docId);
+        result.failed++;
       }
     }
+    this.notifyBridgeBatchPurged(docIds);
+  }
 
+  private notifyBridgeBatchPurged(docIds: string[]) {
+    try {
+      const bridge = (window as any).medicmobile_android;
+      if (bridge && typeof bridge.p2pConfirmBatchPurged === 'function') {
+        bridge.p2pConfirmBatchPurged(JSON.stringify(docIds));
+      }
+    } catch (err) {
+      console.debug('P2pTransitPurge: bridge confirm failed', err);
+    }
+  }
+
+  async purgeConfirmedTransitDocs(): Promise<PurgeResult> {
+    const result: PurgeResult = { purged: 0, failed: 0, alreadyPurged: 0 };
+    const transitDoc = await this.getTransitDoc();
+    if (!transitDoc) {
+      return result;
+    }
+
+    const purgeableBatchIds = this.getPurgeableBatchIds(transitDoc);
     if (purgeableBatchIds.length === 0) {
       return result;
     }
 
-    // Collect doc IDs from purgeable batches
-    const docIdsToPurge: string[] = [];
-    for (const [docId, batchId] of Object.entries(transitDoc.transit_index)) {
-      if (purgeableBatchIds.includes(batchId)) {
-        docIdsToPurge.push(docId);
-      }
-    }
-
-    // Purge in batches, tracking failures so we don't remove them from transit_index
+    const docIdsToPurge = this.getDocIdsForBatches(transitDoc, purgeableBatchIds);
     const failedDocIds = new Set<string>();
+
     for (let i = 0; i < docIdsToPurge.length; i += PURGE_BATCH_SIZE) {
       const batch = docIdsToPurge.slice(i, i + PURGE_BATCH_SIZE);
-      for (const docId of batch) {
-        try {
-          const success = await this.purgeDoc(docId);
-          if (success) {
-            result.purged++;
-          } else {
-            result.alreadyPurged++;
-          }
-        } catch (err) {
-          console.error('P2pTransitPurge: failed to purge doc', docId, err);
-          failedDocIds.add(docId);
-          result.failed++;
-        }
-      }
-
-      // Notify native bridge of batch completion (best-effort, may be null after restart)
-      try {
-        const bridge = (window as any).medicmobile_android;
-        if (bridge && typeof bridge.p2pConfirmBatchPurged === 'function') {
-          bridge.p2pConfirmBatchPurged(JSON.stringify(batch));
-        }
-      } catch (err) {
-        console.debug('P2pTransitPurge: bridge confirm failed', err);
-      }
+      await this.purgeDocBatch(batch, result, failedDocIds);
     }
 
-    // Only update transit doc if at least some docs were actually purged
     if (result.purged > 0 || result.alreadyPurged > 0) {
-      // Only remove successfully purged doc IDs from transit_index
-      const successfullyPurged = docIdsToPurge.filter(
-        id => !failedDocIds.has(id)
-      );
+      const successfullyPurged = docIdsToPurge.filter(id => !failedDocIds.has(id));
       await this.updateTransitDocAfterPurge(transitDoc, purgeableBatchIds, successfullyPurged);
       await this.transitFilterService.refresh();
     }
@@ -168,56 +171,65 @@ export class P2pTransitPurgeService {
    * - Remove purged doc IDs from transit_index
    * - Update stats
    */
+  private applyPurgeToDoc(
+    doc: TransitDoc, purgedBatchIds: string[], purgedDocIds: string[], now: number
+  ) {
+    for (const docId of purgedDocIds) {
+      delete doc.transit_index[docId];
+    }
+    this.markBatchesAsPurged(doc, purgedBatchIds, now);
+  }
+
+  private markBatchesAsPurged(doc: TransitDoc, purgedBatchIds: string[], now: number) {
+    for (const batchId of purgedBatchIds) {
+      const hasRemainingDocs = Object.values(doc.transit_index).includes(batchId);
+      if (!hasRemainingDocs && doc.batches[batchId]) {
+        doc.batches[batchId].purged = true;
+        doc.batches[batchId].purged_at = now;
+      }
+    }
+  }
+
+  private async saveTransitDocWithRetry(
+    transitDoc: TransitDoc, purgedBatchIds: string[], purgedDocIds: string[], now: number
+  ): Promise<void> {
+    const db = this.dbService.get();
+    try {
+      await db.put(transitDoc);
+    } catch (err: any) {
+      if (err.status !== 409) {
+        console.error('P2pTransitPurge: failed to update transit doc after purge', err);
+        return;
+      }
+      await this.retrySaveTransitDoc(purgedBatchIds, purgedDocIds, now);
+    }
+  }
+
+  private async retrySaveTransitDoc(
+    purgedBatchIds: string[], purgedDocIds: string[], now: number
+  ): Promise<void> {
+    try {
+      const db = this.dbService.get();
+      const fresh = await db.get(TRANSIT_DOC_ID);
+      this.applyPurgeToDoc(fresh, purgedBatchIds, purgedDocIds, now);
+      fresh.stats.total_purged = (fresh.stats.total_purged || 0) + purgedDocIds.length;
+      fresh.stats.pending_push = Math.max(0, (fresh.stats.pending_push || 0) - purgedDocIds.length);
+      await db.put(fresh);
+    } catch (retryErr) {
+      console.error('P2pTransitPurge: failed to update transit doc after purge (retry)', retryErr);
+    }
+  }
+
   private async updateTransitDocAfterPurge(
     transitDoc: TransitDoc,
     purgedBatchIds: string[],
     purgedDocIds: string[]
   ): Promise<void> {
-    const db = this.dbService.get();
     const now = Date.now();
-
-    for (const docId of purgedDocIds) {
-      delete transitDoc.transit_index[docId];
-    }
-
-    // Only mark a batch as purged if none of its docs remain in transit_index
-    for (const batchId of purgedBatchIds) {
-      const hasRemainingDocs = Object.values(transitDoc.transit_index).includes(batchId);
-      if (!hasRemainingDocs && transitDoc.batches[batchId]) {
-        transitDoc.batches[batchId].purged = true;
-        transitDoc.batches[batchId].purged_at = now;
-      }
-    }
-
+    this.applyPurgeToDoc(transitDoc, purgedBatchIds, purgedDocIds, now);
     transitDoc.stats.total_purged += purgedDocIds.length;
     transitDoc.stats.pending_push = Math.max(0, transitDoc.stats.pending_push - purgedDocIds.length);
-
-    try {
-      await db.put(transitDoc);
-    } catch (err: any) {
-      if (err.status === 409) {
-        try {
-          const fresh = await db.get(TRANSIT_DOC_ID);
-          for (const docId of purgedDocIds) {
-            delete fresh.transit_index[docId];
-          }
-          for (const batchId of purgedBatchIds) {
-            const hasRemainingDocs = Object.values(fresh.transit_index).includes(batchId);
-            if (!hasRemainingDocs && fresh.batches[batchId]) {
-              fresh.batches[batchId].purged = true;
-              fresh.batches[batchId].purged_at = now;
-            }
-          }
-          fresh.stats.total_purged = (fresh.stats.total_purged || 0) + purgedDocIds.length;
-          fresh.stats.pending_push = Math.max(0, (fresh.stats.pending_push || 0) - purgedDocIds.length);
-          await db.put(fresh);
-        } catch (retryErr) {
-          console.error('P2pTransitPurge: failed to update transit doc after purge (retry)', retryErr);
-        }
-      } else {
-        console.error('P2pTransitPurge: failed to update transit doc after purge', err);
-      }
-    }
+    await this.saveTransitDocWithRetry(transitDoc, purgedBatchIds, purgedDocIds, now);
   }
 
   /**
@@ -225,28 +237,27 @@ export class P2pTransitPurgeService {
    * Called after a successful server sync with 0 doc_write_failures confirms
    * all P2P-received docs have reached the server.
    */
-  async markAllBatchesPushedAndPurge(): Promise<PurgeResult> {
-    const db = this.dbService.get();
-    let transitDoc: TransitDoc;
-    try {
-      transitDoc = await db.get(TRANSIT_DOC_ID);
-    } catch (err: any) {
-      if (err.status === 404) {
-        return { purged: 0, failed: 0, alreadyPurged: 0 };
-      }
-      throw err;
-    }
-
+  private markUnpushedBatches(transitDoc: TransitDoc): boolean {
     let changed = false;
+    const now = Date.now();
     for (const batch of Object.values(transitDoc.batches)) {
       if (!batch.pushed_to_server) {
         batch.pushed_to_server = true;
-        batch.pushed_at = Date.now();
+        batch.pushed_at = now;
         changed = true;
       }
     }
+    return changed;
+  }
 
-    if (changed) {
+  async markAllBatchesPushedAndPurge(): Promise<PurgeResult> {
+    const transitDoc = await this.getTransitDoc();
+    if (!transitDoc) {
+      return { purged: 0, failed: 0, alreadyPurged: 0 };
+    }
+
+    if (this.markUnpushedBatches(transitDoc)) {
+      const db = this.dbService.get();
       await db.put(transitDoc);
     }
 
@@ -256,47 +267,36 @@ export class P2pTransitPurgeService {
   /**
    * Get the count of transit docs that are pending purge (pushed but not yet purged).
    */
+  private countPendingPurgeDocs(transitDoc: TransitDoc): number {
+    return Object.values(transitDoc.batches)
+      .filter(batch => batch.pushed_to_server && !batch.purged)
+      .reduce((sum, batch) => sum + batch.doc_count, 0);
+  }
+
   async getPendingPurgeCount(): Promise<number> {
-    try {
-      const db = this.dbService.get();
-      const transitDoc: TransitDoc = await db.get(TRANSIT_DOC_ID);
-      let count = 0;
-      for (const batch of Object.values(transitDoc.batches)) {
-        if (batch.pushed_to_server && !batch.purged) {
-          count += batch.doc_count;
-        }
-      }
-      return count;
-    } catch (err: any) {
-      if (err.status === 404) {
-        return 0;
-      }
-      throw err;
+    const transitDoc = await this.getTransitDoc();
+    if (!transitDoc) {
+      return 0;
     }
+    return this.countPendingPurgeDocs(transitDoc);
   }
 
   /**
    * Check if there are stale transit docs (unpushed for >30 days).
    * G27: Show user notification for stale transit docs.
    */
+  private hasStaleBatch(transitDoc: TransitDoc, cutoff: number): boolean {
+    return Object.values(transitDoc.batches).some(
+      batch => !batch.pushed_to_server && !batch.purged && batch.received_at < cutoff
+    );
+  }
+
   async hasStaleTransitDocs(): Promise<boolean> {
     const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
-    const cutoff = Date.now() - THIRTY_DAYS_MS;
-
-    try {
-      const db = this.dbService.get();
-      const transitDoc: TransitDoc = await db.get(TRANSIT_DOC_ID);
-      for (const batch of Object.values(transitDoc.batches)) {
-        if (!batch.pushed_to_server && !batch.purged && batch.received_at < cutoff) {
-          return true;
-        }
-      }
+    const transitDoc = await this.getTransitDoc();
+    if (!transitDoc) {
       return false;
-    } catch (err: any) {
-      if (err.status === 404) {
-        return false;
-      }
-      throw err;
     }
+    return this.hasStaleBatch(transitDoc, Date.now() - THIRTY_DAYS_MS);
   }
 }
