@@ -112,6 +112,29 @@ describe('Users service', () => {
       chai.expect(settings.password).to.equal(undefined);
     });
 
+    /**
+     * A device key lets a phone produce signed offline data bundles that are written as this user,
+     * and it does not depend on the password. Without this, changing the password after a phone is
+     * lost would block ordinary sync while leaving that phone able to keep injecting data through
+     * a relay.
+     */
+    it('drops every registered device key when the password changes', () => {
+      const user = { name: 'john', keys_by_device: { 'device-a': { signing_public_key: {} } } };
+
+      const updated = service.__get__('getUserUpdates')(user, { password: 'new-one' }, true);
+
+      chai.expect(updated.keys_by_device).to.equal(undefined);
+    });
+
+    it('leaves device keys alone when the password is not changing', () => {
+      const keys = { 'device-a': { signing_public_key: {} } };
+      const user = { name: 'john', keys_by_device: keys };
+
+      const updated = service.__get__('getUserUpdates')(user, { roles: ['chw'] }, true);
+
+      chai.expect(updated.keys_by_device).to.deep.equal(keys);
+    });
+
     it('reassigns place and contact fields', () => {
       const data = {
         place: 'abc',

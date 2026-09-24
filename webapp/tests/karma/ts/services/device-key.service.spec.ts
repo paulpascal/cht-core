@@ -194,4 +194,28 @@ describe('DeviceKey service', () => {
     expect(consoleError.callCount).to.equal(1);
     expect(consoleError.args[0][0]).to.equal('DeviceKeyService :: Error registering device key');
   });
+
+  describe('forgetting the key', () => {
+    // A device key does not depend on the password, so a lost phone could keep sending through a
+    // relay after the password was changed. The server drops every key; this drops the local copy
+    // so the next sync provisions a new one instead of believing it is still registered.
+    it('removes the local key material', async () => {
+      const doc = { _id: '_local/offline-device-keys', _rev: '1-a', device_id: DEVICE_ID };
+      medicDb.get.resolves(doc);
+      medicDb.remove = sinon.stub().resolves();
+
+      await service.forget();
+
+      expect(medicDb.remove.args).to.deep.equal([[doc]]);
+    });
+
+    it('does nothing when there is no key to forget', async () => {
+      medicDb.get.rejects(notFound());
+      medicDb.remove = sinon.stub().resolves();
+
+      await service.forget();
+
+      expect(medicDb.remove.notCalled).to.be.true;
+    });
+  });
 });

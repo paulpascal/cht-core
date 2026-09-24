@@ -88,6 +88,20 @@ export class DeviceKeyService {
     }
   }
 
+  /**
+   * Forgets this device's key material, so the next successful sync provisions a fresh pair.
+   *
+   * Called when the password changes: the server drops every device key for the user at the same
+   * moment, and a device that kept its own copy would believe it was still registered and never
+   * re-register, leaving it unable to send.
+   */
+  async forget() {
+    const doc = await this.getLocalDoc();
+    if (doc) {
+      await this.dbService.get().remove(doc);
+    }
+  }
+
   private async registerDeviceKeys() {
     // Ordered cheapest first: both of these are free, and neither a database read nor a keypair is
     // worth doing for a device that is already registered or a session that cannot name itself.
