@@ -143,6 +143,17 @@ describe('OfflineSyncBundleStore service', () => {
       expect(bundlesDb.remove.args).to.deep.equal([[bundle]]);
     });
 
+    // PouchDB's cached doc_count does not count a document written with an inline attachment, and
+    // every bundle has one, so counting has to come from the rows.
+    it('counts what is still waiting from the documents themselves', async () => {
+      bundlesDb.allDocs.resolves({ rows: [
+        { doc: { _id: 'waiting', received_date: 100 } },
+        { doc: { _id: 'refused', received_date: 200, undeliverable: true } },
+      ] });
+
+      expect(await service.count()).to.equal(1);
+    });
+
     it('leaves out a bundle it has stopped offering', async () => {
       bundlesDb.allDocs.resolves({ rows: [
         { doc: { _id: 'good', received_date: 100 } },
