@@ -73,7 +73,11 @@ export class OfflineSyncService {
    * failing, and the rest of the app is unaffected.
    */
   private get bridge() {
-    return (globalThis as any)?.medicmobile_android ?? null;
+    const bridge = (globalThis as any)?.medicmobile_android ?? null;
+    // An app older than this webapp has the bridge but not these methods, and every call below
+    // would throw a TypeError the user cannot act on. Treated as "no bridge" so the page says the
+    // app is out of date instead.
+    return typeof bridge?.offline_sync_host_available === 'function' ? bridge : null;
   }
 
   /** True only when running inside cht-android with the offline sync methods present. */
@@ -98,12 +102,12 @@ export class OfflineSyncService {
   }
 
   isSupported(): boolean {
-    return !!this.bridge && typeof this.bridge.offline_sync_host_available === 'function';
+    return !!this.bridge;
   }
 
   /** Whether this user may relay another device's data, and this device can host a session. */
   async canHost(): Promise<boolean> {
-    if (!this.isSupported() || !this.bridge.offline_sync_host_available()) {
+    if (!this.bridge?.offline_sync_host_available()) {
       return false;
     }
     return this.authService.has('can_relay_offline_data_bundle');
@@ -111,7 +115,7 @@ export class OfflineSyncService {
 
   /** Whether this user may send their data to a relay, and this device can join a session. */
   async canJoin(): Promise<boolean> {
-    if (!this.isSupported() || !this.bridge.offline_sync_join_available()) {
+    if (!this.bridge?.offline_sync_join_available()) {
       return false;
     }
     return this.authService.has('can_send_offline_data_bundle');

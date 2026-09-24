@@ -105,6 +105,7 @@
           }
           <button mat-button color="primary" (click)="stopHosting()">{{ 'offline_sync.host.stop' | translate }}</button>
           <button mat-stroked-button (click)="stopHosting()" translate>offline_sync.host.stop</button>
+          <button mat-stroked-button (click)="stopHosting()">{{ 'offline_sync.host.stop' | translate }}</button>
         </mat-card-content>
       </mat-card>
     }
@@ -125,6 +126,7 @@
 
           <button mat-flat-button color="primary" (click)="send()">{{ 'offline_sync.transfer.send' | translate }}</button>
           <button mat-button color="primary" (click)="leaveSession()">{{ 'offline_sync.peer.leave' | translate }}</button>
+          <button mat-stroked-button (click)="leaveSession()">{{ 'offline_sync.peer.leave' | translate }}</button>
         </mat-card-content>
       </mat-card>
     }
@@ -154,6 +156,7 @@
             <p>{{ 'offline_sync.transfer.too_large' | translate:{ count: skipped } }}</p>
           }
           <button mat-button color="primary" (click)="leaveSession()">{{ 'offline_sync.peer.leave' | translate }}</button>
+          <button mat-stroked-button (click)="leaveSession()">{{ 'offline_sync.peer.leave' | translate }}</button>
         </mat-card-content>
       </mat-card>
     }
@@ -181,7 +184,7 @@
     @if (errorKey && state !== 'failed') {
       <mat-card class="offline-sync-warning">
         <mat-card-content>
-          <p translate>{{ errorKey }}</p>
+          <p>{{ errorKey | translate }}</p>
         </mat-card-content>
       </mat-card>
     }
