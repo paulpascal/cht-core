@@ -126,6 +126,7 @@ describe('OfflineSync service', () => {
       service.hostingResult().subscribe(result => {
         expect(result.ok).to.be.true;
         expect(result.session).to.deep.equal(session);
+        expect(result).to.deep.equal({ ok: true, detail: 'data:image/png;base64,abc', diagnostic: undefined });
         done();
       });
 

@@ -233,7 +233,10 @@ export class OfflineSyncComponent implements OnInit, OnDestroy {
     // in the field, and support has nothing to look at.
       .submit({ message: `Offline sync failed: ${code}` })
     this.feedbackService
-      .submit({ message: `Offline sync failed: ${code} [${this.offlineSyncService.deviceDescription()}]` })
+      .submit({
+        message: `Offline sync failed: ${code} [${this.offlineSyncService.deviceDescription()}]`
+          + (diagnostic ? ` ${diagnostic}` : ''),
+      })
       .catch(err => console.error('OfflineSyncComponent :: Error recording the failure', err));
   }
 

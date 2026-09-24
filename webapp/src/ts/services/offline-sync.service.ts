@@ -45,6 +45,7 @@ export interface OfflineSyncResult {
   diagnostic?: string;
   /** Set only when a hosting session started. */
   session?: HostingSession;
+
 }
 
 /**
@@ -257,6 +258,7 @@ export class OfflineSyncService {
       console.error('OfflineSyncService :: Could not read the hosting session', err);
       this.hostingSubject.next({ ok: false, detail: 'payload_failed' });
     }
+    this.hostingSubject.next({ ok, detail, diagnostic });
   }
 
   pairingResolved(ok: boolean, detail: string) {
