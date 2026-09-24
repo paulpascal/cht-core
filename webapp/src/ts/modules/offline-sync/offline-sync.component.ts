@@ -177,10 +177,10 @@ export class OfflineSyncComponent implements OnInit, OnDestroy {
   /**
    * Turns a failure into a translation key.
    *
-   * Codes reach this from two places now, the native side and the webapp's own transfer services,
-   * and only the native ones are covered by check-offline-sync-codes.sh. So anything that is not shaped
-   * like a code is treated as unknown rather than rendered: a stray Error message would otherwise
-   * be shown to a CHW as `offline_sync.error.Something went wrong`.
+   * Codes reach this from two places, the native side and the webapp's own transfer services, and
+   * check-offline-sync-codes.sh asserts that both have a key in every language. What it cannot see is an
+   * ordinary runtime error arriving here as a sentence, so anything not shaped like a code is
+   * treated as unknown rather than rendered as `offline_sync.error.Something went wrong`.
    */
   private fail(code: string, diagnostic?: string) {
     this.errorKey = `offline_sync.error.${code || 'unknown'}`;
