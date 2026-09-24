@@ -63,6 +63,8 @@ export class OfflineSyncComponent implements OnInit, OnDestroy {
   skipped = 0;
   /** How many bundles this device is carrying for other people. */
   carrying = 0;
+  /** How many it has stopped offering to the server, which nobody can fix from this phone. */
+  undeliverable = 0;
 
   supported = false;
   canHost = false;
@@ -88,7 +90,7 @@ export class OfflineSyncComponent implements OnInit, OnDestroy {
 
   async ngOnInit() {
     this.supported = this.offlineSyncService.isSupported();
-    this.carrying = await this.bundleStoreService.count();
+    await this.countCarried();
     const [canHost, canJoin, keys] = await Promise.all([
       this.offlineSyncService.canHost(),
       this.offlineSyncService.canJoin(),
@@ -170,10 +172,18 @@ export class OfflineSyncComponent implements OnInit, OnDestroy {
     }
   }
 
+  private async countCarried() {
+    [this.carrying, this.undeliverable] = await Promise.all([
+      this.bundleStoreService.count(),
+      this.bundleStoreService.undeliverable(),
+    ]);
+  }
+
   /** Takes what a peer has just delivered into this device's store. */
   private async collectBundles() {
     try {
-      this.carrying += await this.bundleStoreService.collect();
+      await this.bundleStoreService.collect();
+      await this.countCarried();
     } catch (err: any) {
       // The bundle stays on the native side and is collected again, so the session is left alone.
       // The user is still told, because a phone that cannot store what it is being handed will not
