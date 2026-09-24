@@ -296,6 +296,27 @@ const verifyUpdateRequest = async (req) => {
  *               - fields: [password, 'type or roles']
  *                 index: 1
  */
+/**
+ * Stores the server's key for this device, turning a vault failure into something a person can act
+ * on.
+ *
+ * The vault encrypts what it stores with the CouchDB auth secret, and CouchDB answers 404 when that
+ * secret is not configured. Left alone, that 404 reaches the device unchanged, which reads as "this
+ * device is not registered" and sends whoever is looking to the phone, when the fault is on the
+ * server and nothing the phone does will fix it.
+ */
+const storeServerKey = async (req, username, deviceId, identity) => {
+  try {
+    await serverKey.setServerPrivateKey(username, deviceId, identity);
+  } catch (err) {
+    logger.error(`REQ ${req.id} - Could not store the server key for '${username}'/'${deviceId}': %o`, err);
+    throw {
+      code: 500,
+      message: 'Could not store the key for this device. Check that the CouchDB secret is configured.',
+    };
+  }
+};
+
 module.exports = {
   /**
    * @openapi
@@ -562,7 +583,7 @@ module.exports = {
       // The server PRIVATE key must never touch the _users doc (the user can read it via the
       // CouchDB proxy). It goes to the secureSettings vault; only the device's public key goes on
       // the _users doc.
-      await serverKey.setServerPrivateKey(username, deviceId, identity);
+      await storeServerKey(req, username, deviceId, identity);
       await users.setDeviceKey(username, deviceId, req.body.signing_key);
 
       logger.info(`REQ ${req.id} - Registered device key for device '${deviceId}' on user '${username}'.`);

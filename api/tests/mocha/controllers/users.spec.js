@@ -1176,5 +1176,29 @@ describe('Users Controller', () => {
         chai.expect(serverUtils.error.args[0]).to.deep.equal([saveError, req, res]);
       });
     });
+
+    /**
+     * The vault encrypts with the CouchDB auth secret, and CouchDB answers 404 when that is not
+     * configured. Passed through untouched, the device reads that as "this device is not
+     * registered" and the person looking goes to the phone, where there is nothing to fix.
+     */
+    it('reports a vault failure as a server problem, not as an unknown device', () => {
+      const vaultError = new Error('missing');
+      vaultError.status = 404;
+      secureSettings.setCredentials.rejects(vaultError);
+      req = {
+        id: 'req-4',
+        params: { username: 'chw', device_id: 'device-1' },
+        body: { signing_key: signingJwk },
+      };
+
+      return controller.deviceKey(req, res).then(() => {
+        chai.expect(res.json.notCalled).to.be.true;
+        chai.expect(users.setDeviceKey.called).to.be.false;
+        const [reported] = serverUtils.error.args[0];
+        chai.expect(reported.code).to.equal(500);
+        chai.expect(reported.message).to.match(/CouchDB secret/);
+      });
+    });
   });
 });

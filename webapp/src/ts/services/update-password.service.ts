@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { lastValueFrom } from 'rxjs';
 
 import { DeviceKeyService } from '@mm-services/device-key.service';
 
@@ -9,7 +10,7 @@ import { DeviceKeyService } from '@mm-services/device-key.service';
 export class UpdatePasswordService {
 
   constructor(
-    private http: HttpClient,
+    private readonly http: HttpClient,
     private readonly deviceKeyService: DeviceKeyService,
   ) { }
 
@@ -31,7 +32,7 @@ export class UpdatePasswordService {
       Authorization: 'Basic ' + window.btoa(username + ':' + currentPassword)
     });
     const updates = { password: newPassword };
-    const result = await this.http.post(url, updates, { headers }).toPromise();
+    const result = await lastValueFrom(this.http.post(url, updates, { headers }));
 
     // The server has just dropped every device key for this user, so the copy held here is no
     // longer trusted by anything. Forgetting it is what makes the next sync provision a new one.
