@@ -15,6 +15,8 @@ import { OfflineSyncTransferService } from '@mm-services/offline-sync-transfer.s
 import { ToolBarComponent } from '@mm-components/tool-bar/tool-bar.component';
 
 /** What the screen is doing right now. */
+const CODE = /^[a-z0-9_]+$/;
+
 type OfflineSyncState = 'idle' | 'starting' | 'hosting' | 'joining' | 'paired' | 'sending' | 'sent' | 'failed';
 
 @Component({
@@ -73,6 +75,7 @@ export class OfflineSyncComponent implements OnInit, OnDestroy {
 
   async ngOnInit() {
     this.supported = this.offlineSyncService.isSupported();
+    this.carrying = await this.bundleStoreService.count();
     [this.canHost, this.canJoin] = await Promise.all([
       this.offlineSyncService.canHost(),
       this.offlineSyncService.canJoin(),
@@ -155,9 +158,11 @@ export class OfflineSyncComponent implements OnInit, OnDestroy {
     try {
       this.carrying += await this.bundleStoreService.collect();
     } catch (err: any) {
-      // The bundle stays on the native side and is collected again, so this is worth reporting
-      // without tearing down a session that is otherwise working.
+      // The bundle stays on the native side and is collected again, so the session is left alone.
+      // The user is still told, because a phone that cannot store what it is being handed will not
+      // fix itself.
       console.error('OfflineSyncComponent :: Error collecting a delivered bundle', err);
+      this.errorKey = 'offline_sync.error.bundle_store_failed';
     }
   }
 
@@ -170,13 +175,17 @@ export class OfflineSyncComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * The native side sends a stable code, so it maps straight to a translation key. Nothing here
-   * validates the code: what keeps a CHW from seeing a raw `offline_sync.error.<code>` is that every code
-   * cht-android can report has a key in messages-en.properties, checked by check-offline-sync-codes.sh.
-   * The fallback only covers an empty detail.
+   * Turns a failure into a translation key.
+   *
+   * Codes reach this from two places now, the native side and the webapp's own transfer services,
+   * and only the native ones are covered by check-offline-sync-codes.sh. So anything that is not shaped
+   * like a code is treated as unknown rather than rendered: a stray Error message would otherwise
+   * be shown to a CHW as `offline_sync.error.Something went wrong`.
    */
   private fail(code: string, diagnostic?: string) {
     this.errorKey = `offline_sync.error.${code || 'unknown'}`;
+  private fail(code: string) {
+    this.errorKey = `offline_sync.error.${CODE.test(code) ? code : 'unknown'}`;
     this.state = 'failed';
     // Hosting is entirely on-device, so nothing about a failure reaches the server on its own.
     // Without this, the only record of why a session failed is a sentence on a screen in the
