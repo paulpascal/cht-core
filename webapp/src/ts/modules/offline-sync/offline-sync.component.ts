@@ -177,9 +177,10 @@ export class OfflineSyncComponent implements OnInit, OnDestroy {
   /**
    * Turns a failure into a translation key.
    *
-   * Codes reach this from two places now, the native side and the webapp's own transfer services,
-   * so anything that is not shaped like a code is treated as unknown rather than rendered: a stray
-   * Error message would otherwise be shown to the user as `offline_sync.error.Something went wrong`.
+   * Codes reach this from two places, the native side and the webapp's own transfer services, and
+   * each of them needs a key in every language. What that cannot cover is an ordinary runtime error
+   * arriving here as a sentence, so anything not shaped like a code is treated as unknown rather
+   * than rendered as `offline_sync.error.Something went wrong`.
    */
   private fail(code: string, diagnostic?: string) {
     this.errorKey = `offline_sync.error.${code || 'unknown'}`;
