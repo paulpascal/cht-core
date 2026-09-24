@@ -11,6 +11,7 @@ import { ToolBarComponent } from '@mm-components/tool-bar/tool-bar.component';
 import { OfflineSyncComponent } from '@mm-modules/offline-sync/offline-sync.component';
 import { FeedbackService } from '@mm-services/feedback.service';
 import { DeviceKeyService } from '@mm-services/device-key.service';
+import { FeedbackService } from '@mm-services/feedback.service';
 import { OfflineSyncBundleStoreService } from '@mm-services/offline-sync-bundle-store.service';
 import { OfflineSyncResult, OfflineSyncService } from '@mm-services/offline-sync.service';
 import { OfflineSyncTransferService } from '@mm-services/offline-sync-transfer.service';
@@ -36,6 +37,7 @@ describe('OfflineSync component', () => {
   let bundleStoreService;
   let deviceKeyService;
   let transferService;
+  let feedbackService;
   let hostingResult: Subject<OfflineSyncResult>;
   let pairingResult: Subject<OfflineSyncResult>;
   let permissionsResolved: Subject<boolean>;
@@ -55,6 +57,7 @@ describe('OfflineSync component', () => {
         { provide: OfflineSyncBundleStoreService, useValue: bundleStoreService },
         { provide: DeviceKeyService, useValue: deviceKeyService },
         { provide: OfflineSyncTransferService, useValue: transferService },
+        { provide: FeedbackService, useValue: feedbackService },
       ],
     });
     TestBed.overrideComponent(OfflineSyncComponent, {
@@ -81,6 +84,7 @@ describe('OfflineSync component', () => {
       undeliverable: sinon.stub().resolves(0),
     };
     transferService = { handOver: sinon.stub().resolves({ delivered: 2, skipped: 0 }) };
+    feedbackService = { submit: sinon.stub().resolves() };
     offlineSyncService = {
       isSupported: sinon.stub().returns(true),
       deviceDescription: sinon.stub().returns('Pixel 7, Android 14 (API 34)'),
@@ -148,6 +152,17 @@ describe('OfflineSync component', () => {
       expect(component.state).to.equal('failed');
       expect(component.errorKey).to.equal('offline_sync.error.hotspot_unsupported');
       expect(component.qrImage).to.be.null;
+    });
+
+    it('records the failure, since a hotspot that will not start never reaches the server', async () => {
+      await create();
+
+      component.startHosting();
+      hostingResult.next({ ok: false, detail: 'hotspot_tethering_disallowed' });
+
+      expect(feedbackService.submit.callCount).to.equal(1);
+      expect(feedbackService.submit.args[0][0].message)
+        .to.equal('Offline sync failed: hotspot_tethering_disallowed');
     });
 
     it('falls back to a real message for a code it does not know', async () => {
