@@ -105,6 +105,25 @@ export class OfflineSyncService {
     return !!this.bridge;
   }
 
+  /**
+   * Make, model and Android version, for the record kept when a session fails.
+   *
+   * Hosting depends on what the hardware and the OEM allow, so a failure code on its own does not
+   * say whether the same phone would ever work. Read here rather than at the call site to keep
+   * every use of the bridge in one file.
+   */
+  deviceDescription(): string {
+    try {
+      const info = JSON.parse(this.bridge?.getDeviceInfo() || '{}');
+      const hardware = info.hardware || {};
+      const software = info.software || {};
+      return `${hardware.manufacturer} ${hardware.model}, Android ${software.androidVersion} (API ${software.osApiLevel})`;
+    } catch {
+      // Diagnostics must never be the reason a failure goes unreported.
+      return 'unknown device';
+    }
+  }
+
   /** Whether this user may relay another device's data, and this device can host a session. */
   async canHost(): Promise<boolean> {
     if (!this.bridge?.offline_sync_host_available()) {

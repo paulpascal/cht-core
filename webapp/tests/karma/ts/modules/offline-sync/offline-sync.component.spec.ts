@@ -162,7 +162,7 @@ describe('OfflineSync component', () => {
 
       expect(feedbackService.submit.callCount).to.equal(1);
       expect(feedbackService.submit.args[0][0].message)
-        .to.equal('Offline sync failed: hotspot_tethering_disallowed');
+        .to.equal('Offline sync failed: hotspot_tethering_disallowed [Pixel 7, Android 14 (API 34)]');
     });
 
     it('falls back to a real message for a code it does not know', async () => {

@@ -232,6 +232,8 @@ export class OfflineSyncComponent implements OnInit, OnDestroy {
     // on its own. Without this, the only record of why a handover failed is a sentence on a screen
     // in the field, and support has nothing to look at.
       .submit({ message: `Offline sync failed: ${code}` })
+    this.feedbackService
+      .submit({ message: `Offline sync failed: ${code} [${this.offlineSyncService.deviceDescription()}]` })
       .catch(err => console.error('OfflineSyncComponent :: Error recording the failure', err));
   }
 
