@@ -138,9 +138,24 @@ describe('OfflineSync component', () => {
       expect(component.state).to.equal('starting');
 
       hostingResult.next({ ok: true, detail: '', session: HOSTING_SESSION });
+      hostingResult.next({ ok: true, detail: '', session: { qr: 'data:image/png;base64,abc', ssid: 'AndroidShare_1234', password: 'a-password' } });
 
       expect(component.state).to.equal('hosting');
       expect(component.qrImage).to.equal('data:image/png;base64,abc');
+    });
+
+    it('shows the network beside the code, for a peer that cannot scan', async () => {
+      await create();
+
+      component.startHosting();
+      hostingResult.next({ ok: true, detail: '', session:
+        { qr: 'data:image/png;base64,abc', ssid: 'AndroidShare_1234', password: 'a-password' } });
+      fixture.detectChanges();
+
+      const network = fixture.nativeElement.querySelector('.offline-sync-network');
+      expect(network).to.not.be.null;
+      expect(network.textContent).to.include('AndroidShare_1234');
+      expect(network.textContent).to.include('a-password');
     });
 
     it('turns a failure code into a translation key, never raw text', async () => {
@@ -177,6 +192,7 @@ describe('OfflineSync component', () => {
       await create();
       component.startHosting();
       hostingResult.next({ ok: true, detail: '', session: HOSTING_SESSION });
+      hostingResult.next({ ok: true, detail: '', session: { qr: 'data:image/png;base64,abc', ssid: 'AndroidShare_1234', password: 'a-password' } });
 
       component.stopHosting();
 
@@ -228,7 +244,7 @@ describe('OfflineSync component', () => {
     await create();
 
     component.ngOnDestroy();
-    hostingResult.next({ ok: true, detail: 'ignored' });
+    hostingResult.next({ ok: true, detail: '', session: { qr: 'data:image/png;base64,abc', ssid: 'AndroidShare_1234', password: 'a-password' } });
 
     expect(component.state).to.equal('idle');
   });

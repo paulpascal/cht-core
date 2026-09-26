@@ -30,6 +30,15 @@ export interface ReceivedBundle {
   bytes: number;
 }
 
+/** What the native side reports once a hosting session is up. */
+export interface HostingSession {
+  /** A PNG data URL of the code a peer scans. */
+  qr: string;
+  /** The network a peer joins. Named by the OS, so it is read back rather than chosen. */
+  ssid: string;
+  password: string;
+}
+
 export interface OfflineSyncResult {
   ok: boolean;
   /**
@@ -259,6 +268,7 @@ export class OfflineSyncService {
       this.hostingSubject.next({ ok: false, detail: 'payload_failed' });
     }
     this.hostingSubject.next({ ok, detail, diagnostic });
+
   }
 
   pairingResolved(ok: boolean, detail: string) {
