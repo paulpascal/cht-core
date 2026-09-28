@@ -100,12 +100,7 @@
               <dd>{{ password }}</dd>
             </dl>
           }
-          @if (carrying) {
-            <p>{{ 'offline_sync.host.carrying' | translate:{ count: carrying } }}</p>
-          }
           <button mat-button color="primary" (click)="stopHosting()">{{ 'offline_sync.host.stop' | translate }}</button>
-          <button mat-stroked-button (click)="stopHosting()" translate>offline_sync.host.stop</button>
-          <button mat-stroked-button (click)="stopHosting()">{{ 'offline_sync.host.stop' | translate }}</button>
         </mat-card-content>
       </mat-card>
     }
@@ -117,6 +112,7 @@
         </mat-card-header>
         <mat-card-content>
           <p>{{ 'offline_sync.peer.paired.description' | translate:{ host: hostLabel } }}</p>
+
           <!-- Neither option is an acknowledgement from the server: the choice is how much to
                re-send, and the user is the one who knows whether the last handover arrived. -->
           <mat-radio-group class="offline-sync-scope" [(ngModel)]="scope">
@@ -126,8 +122,6 @@
 
           <button mat-flat-button color="primary" (click)="send()">{{ 'offline_sync.transfer.send' | translate }}</button>
           <button mat-button color="primary" (click)="leaveSession()">{{ 'offline_sync.peer.leave' | translate }}</button>
-          <button mat-stroked-button (click)="leaveSession()">{{ 'offline_sync.peer.leave' | translate }}</button>
-
         </mat-card-content>
       </mat-card>
     }
@@ -157,8 +151,6 @@
             <p>{{ 'offline_sync.transfer.too_large' | translate:{ count: skipped } }}</p>
           }
           <button mat-button color="primary" (click)="leaveSession()">{{ 'offline_sync.peer.leave' | translate }}</button>
-          <button mat-stroked-button (click)="leaveSession()">{{ 'offline_sync.peer.leave' | translate }}</button>
-
         </mat-card-content>
       </mat-card>
     }

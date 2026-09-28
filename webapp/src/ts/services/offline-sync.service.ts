@@ -4,15 +4,6 @@ import { Observable, Subject } from 'rxjs';
 import { AuthService } from '@mm-services/auth.service';
 
 
-/** What the native side reports once a hosting session is up. */
-export interface HostingSession {
-  /** A PNG data URL of the code a peer scans. */
-  qr: string;
-  /** The network a peer joins. Named by the OS, so it is read back rather than chosen. */
-  ssid: string;
-  password: string;
-}
-
 /**
  * How much of a bundle crosses the bridge per call, in decoded bytes.
  *
@@ -54,7 +45,6 @@ export interface OfflineSyncResult {
   diagnostic?: string;
   /** Set only when a hosting session started. */
   session?: HostingSession;
-
 }
 
 /**
@@ -91,26 +81,6 @@ export class OfflineSyncService {
   }
 
   /** True only when running inside cht-android with the offline sync methods present. */
-  /**
-   * Make, model and Android version, for the record kept when a session fails.
-   *
-   * Hosting depends on what the hardware and the OEM allow, so a failure code on its own does not
-   * say whether the same phone would ever work. Read here rather than at the call site to keep
-   * every use of the bridge in one file.
-   */
-  deviceDescription(): string {
-    try {
-      const info = JSON.parse(this.bridge?.getDeviceInfo() || '{}');
-      const hardware = info.hardware || {};
-      const software = info.software || {};
-      return `${hardware.manufacturer} ${hardware.model}, `
-        + `Android ${software.androidVersion} (API ${software.osApiLevel})`;
-    } catch {
-      // Diagnostics must never be the reason a failure goes unreported.
-      return 'unknown device';
-    }
-  }
-
   isSupported(): boolean {
     return !!this.bridge;
   }
@@ -127,7 +97,8 @@ export class OfflineSyncService {
       const info = JSON.parse(this.bridge?.getDeviceInfo() || '{}');
       const hardware = info.hardware || {};
       const software = info.software || {};
-      return `${hardware.manufacturer} ${hardware.model}, Android ${software.androidVersion} (API ${software.osApiLevel})`;
+      return `${hardware.manufacturer} ${hardware.model}, `
+        + `Android ${software.androidVersion} (API ${software.osApiLevel})`;
     } catch {
       // Diagnostics must never be the reason a failure goes unreported.
       return 'unknown device';
@@ -267,8 +238,6 @@ export class OfflineSyncService {
       console.error('OfflineSyncService :: Could not read the hosting session', err);
       this.hostingSubject.next({ ok: false, detail: 'payload_failed' });
     }
-    this.hostingSubject.next({ ok, detail, diagnostic });
-
   }
 
   pairingResolved(ok: boolean, detail: string) {

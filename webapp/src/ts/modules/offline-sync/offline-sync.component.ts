@@ -7,7 +7,6 @@ import { MatProgressBar } from '@angular/material/progress-bar';
 import { TranslateDirective, TranslatePipe } from '@ngx-translate/core';
 import { Subscription } from 'rxjs';
 
-import { FeedbackService } from '@mm-services/feedback.service';
 import { DeviceKeyService } from '@mm-services/device-key.service';
 import { FeedbackService } from '@mm-services/feedback.service';
 import { BundleScope } from '@mm-services/offline-data-bundle.service';
@@ -220,18 +219,9 @@ export class OfflineSyncComponent implements OnInit, OnDestroy {
   private fail(code: string, diagnostic?: string) {
     this.errorKey = `offline_sync.error.${CODE.test(code) ? code : 'unknown'}`;
     this.state = 'failed';
-    // Hosting is entirely on-device, so nothing about a failure reaches the server on its own.
-    // Without this, the only record of why a session failed is a sentence on a screen in the
-    // field, and support has nothing to look at.
-    this.feedbackService
-      .submit({
-        message: `Offline sync failed: ${code} [${this.offlineSyncService.deviceDescription()}]`
-          + (diagnostic ? ` ${diagnostic}` : ''),
-      })
     // A hotspot that will not start is entirely on-device, so nothing about it reaches the server
     // on its own. Without this, the only record of why a handover failed is a sentence on a screen
     // in the field, and support has nothing to look at.
-      .submit({ message: `Offline sync failed: ${code}` })
     this.feedbackService
       .submit({
         message: `Offline sync failed: ${code} [${this.offlineSyncService.deviceDescription()}]`

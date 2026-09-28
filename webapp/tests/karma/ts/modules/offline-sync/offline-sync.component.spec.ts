@@ -9,7 +9,6 @@ import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { ToolBarComponent } from '@mm-components/tool-bar/tool-bar.component';
 
 import { OfflineSyncComponent } from '@mm-modules/offline-sync/offline-sync.component';
-import { FeedbackService } from '@mm-services/feedback.service';
 import { DeviceKeyService } from '@mm-services/device-key.service';
 import { FeedbackService } from '@mm-services/feedback.service';
 import { OfflineSyncBundleStoreService } from '@mm-services/offline-sync-bundle-store.service';
@@ -33,7 +32,6 @@ describe('OfflineSync component', () => {
   let component: OfflineSyncComponent;
   let fixture: ComponentFixture<OfflineSyncComponent>;
   let offlineSyncService;
-  let feedbackService;
   let bundleStoreService;
   let deviceKeyService;
   let transferService;
@@ -53,7 +51,6 @@ describe('OfflineSync component', () => {
       ],
       providers: [
         { provide: OfflineSyncService, useValue: offlineSyncService },
-        { provide: FeedbackService, useValue: feedbackService },
         { provide: OfflineSyncBundleStoreService, useValue: bundleStoreService },
         { provide: DeviceKeyService, useValue: deviceKeyService },
         { provide: OfflineSyncTransferService, useValue: transferService },
@@ -75,7 +72,6 @@ describe('OfflineSync component', () => {
     hostingResult = new Subject<OfflineSyncResult>();
     pairingResult = new Subject<OfflineSyncResult>();
     permissionsResolved = new Subject<boolean>();
-    feedbackService = { submit: sinon.stub().resolves() };
     bundleReceived = new Subject<string>();
     deviceKeyService = { getKeyMaterial: sinon.stub().resolves({ deviceId: 'device-1' }) };
     bundleStoreService = {
@@ -138,7 +134,6 @@ describe('OfflineSync component', () => {
       expect(component.state).to.equal('starting');
 
       hostingResult.next({ ok: true, detail: '', session: HOSTING_SESSION });
-      hostingResult.next({ ok: true, detail: '', session: { qr: 'data:image/png;base64,abc', ssid: 'AndroidShare_1234', password: 'a-password' } });
 
       expect(component.state).to.equal('hosting');
       expect(component.qrImage).to.equal('data:image/png;base64,abc');
@@ -192,7 +187,6 @@ describe('OfflineSync component', () => {
       await create();
       component.startHosting();
       hostingResult.next({ ok: true, detail: '', session: HOSTING_SESSION });
-      hostingResult.next({ ok: true, detail: '', session: { qr: 'data:image/png;base64,abc', ssid: 'AndroidShare_1234', password: 'a-password' } });
 
       component.stopHosting();
 
@@ -244,7 +238,7 @@ describe('OfflineSync component', () => {
     await create();
 
     component.ngOnDestroy();
-    hostingResult.next({ ok: true, detail: '', session: { qr: 'data:image/png;base64,abc', ssid: 'AndroidShare_1234', password: 'a-password' } });
+    hostingResult.next({ ok: true, detail: '', session: HOSTING_SESSION });
 
     expect(component.state).to.equal('idle');
   });
