@@ -79,12 +79,10 @@ export class OfflineSyncComponent implements OnInit, OnDestroy {
   loading = true;
 
   constructor(
-
     private readonly bundleStoreService: OfflineSyncBundleStoreService,
     private readonly deviceKeyService: DeviceKeyService,
-    private readonly offlineSyncService: OfflineSyncService,
     private readonly feedbackService: FeedbackService,
-    private readonly bundleStoreService: OfflineSyncBundleStoreService,
+    private readonly offlineSyncService: OfflineSyncService,
     private readonly transferService: OfflineSyncTransferService,
   ) { }
 
@@ -202,8 +200,6 @@ export class OfflineSyncComponent implements OnInit, OnDestroy {
    * treated as unknown rather than rendered as `offline_sync.error.Something went wrong`.
    */
   private fail(code: string, diagnostic?: string) {
-    this.errorKey = `offline_sync.error.${code || 'unknown'}`;
-  private fail(code: string) {
     this.errorKey = `offline_sync.error.${CODE.test(code) ? code : 'unknown'}`;
     this.state = 'failed';
     // Hosting is entirely on-device, so nothing about a failure reaches the server on its own.
