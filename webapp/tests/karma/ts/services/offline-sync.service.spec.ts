@@ -57,6 +57,12 @@ describe('OfflineSync service', () => {
       expect(await service.canHost()).to.be.false;
     });
 
+    it('reports no received bundles from an app that predates these methods', () => {
+      withBridge({ getAppVersion: sinon.stub() });
+
+      expect(service.receivedBundles()).to.deep.equal([]);
+    });
+
     it('allows hosting for a user who may relay, on a device that can host', async () => {
       withBridge(bridge());
 
